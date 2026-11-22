@@ -18,7 +18,7 @@ This harness uses project-level model preferences in `opencode.jsonc`; it does n
 2. Open the Flutter project, run `opencode service restart` in a terminal and start a **new session**. OpenCode loads the project config from the repository root.
 3. Check that the models are available using `opencode models` or `/models`. Verify the selected session model and variant; a model named in a config file alone does not prove the provider permits it.
 4. Inspect the effective settings with `opencode debug config`; redact any secrets before sharing logs.
-5. Use the `build` agent as the Luna-led orchestrator. Before substantial work ask it explicitly to delegate design to `architect`, and request `reviewer` once before the PR. A subagent uses its configured model; switching primary agents in an existing session **does not necessarily switch the session's selected model**.
+5. Use the default `build` agent as the Luna-led orchestrator. A short feature request is sufficient; the project skill directs `build` to delegate substantive design to `architect` and obtain a focused `reviewer` pass without being prompted each time. A subagent uses its configured model; switching primary agents in an existing session **does not necessarily switch the session's selected model**.
 6. If you manually use the primary `plan` agent, start a new session and explicitly select GPT-6.2 Sol **medium**; then start a fresh Luna coding session. Keep Sol at or below medium.
 
 The initial setup is **not** a hard spending or usage cap. The subscription has included allowance and limits; additional credits require a separate opt-in where applicable. Check ChatGPT **Settings → Usage** for usage by connected apps and any app limits. Avoid repeated full-codebase analysis, needless subagent calls and very long sessions.
@@ -26,6 +26,23 @@ The initial setup is **not** a hard spending or usage cap. The subscription has 
 Model identifiers used by this profile: `openai/gpt-6.2-sol` and `openai/gpt-6-luna`. Reasoning variants are selected with `#low`, `#medium` or `#high` on agent model references. No authentication tokens belong in this repository.
 
 Reference: https://opencode.ai/docs/agents, https://opencode.ai/docs/models, https://opencode.ai/docs/providers.
+
+## Short-prompt autonomy vs. interactive design
+
+The default profile intentionally has no Superpowers plugin. Superpowers
+`brainstorming` requires a separate human design approval even for simple
+requests, as observed in the first lab trial. Instead the first-party
+`flutter-harness` skill interprets a direct feature request as authorization
+to choose routine, reversible technical details and proceed through plan,
+implementation, tests, review and PR preparation. It must not guess material
+product requirements or bypass explicit permission checks.
+
+A user can separately opt into Superpowers for interactive design sessions;
+the upstream skill's approval rules must then be honored. In particular,
+`opencode run` is a one-turn CLI invocation, not an unattended job supervisor.
+A required Git push, external-directory access or other approval may still
+interrupt that turn and require an interactive session. An agent must report
+BLOCKED rather than claim an uncreated PR.
 
 ## Safety and approval boundaries
 
