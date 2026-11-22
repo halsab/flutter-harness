@@ -32,6 +32,8 @@ if [[ ! -f pubspec.yaml ]]; then
   note "Creating the default Flutter SDK project (Android, iOS, Web)..."
   flutter create --project-name flutter_harness_lab --org dev.halsab --platforms=android,ios,web .
   flutter test
+  mkdir -p .github/workflows
+  cp "$ROOT/fixtures/lab-base/.github/workflows/flutter.yml" .github/workflows/flutter.yml
   git add -A
   git commit -m "test(lab): generate default Flutter project using SDK"
   git push -u origin main
