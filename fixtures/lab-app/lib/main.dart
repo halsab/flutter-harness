@@ -27,11 +27,12 @@ class _HarnessLabAppState extends State<HarnessLabApp> {
 
   int nextId = 3;
   bool darkMode = false;
+  final navigatorKey = GlobalKey<NavigatorState>();
 
   Future<void> addTask() async {
     final controller = TextEditingController();
     final title = await showDialog<String>(
-      context: context,
+      context: navigatorKey.currentContext!,
       builder: (dialogContext) => AlertDialog(
         title: const Text('New task'),
         content: TextField(
@@ -61,6 +62,7 @@ class _HarnessLabAppState extends State<HarnessLabApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Harness Lab',
       theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
       darkTheme: ThemeData(
@@ -77,7 +79,7 @@ class _HarnessLabAppState extends State<HarnessLabApp> {
               tooltip: 'Settings',
               icon: const Icon(Icons.settings),
               onPressed: () {
-                Navigator.of(context).push(
+                navigatorKey.currentState!.push(
                   MaterialPageRoute<void>(
                     builder: (_) => _SettingsPage(
                       darkMode: darkMode,
