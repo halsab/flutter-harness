@@ -15,7 +15,7 @@ Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 - Harness: https://github.com/halsab/flutter-harness
 - Test lab: https://github.com/halsab/flutter-harness-lab
 - Lab `main`: generated unmodified Flutter starter (Android, iOS, Web)
-- Lab `app`: minimal Task Manager fixture with widget tests and Maestro smoke
+- Lab `app`: initially identical clean Flutter starter; the agent grows it through tasks and PRs
 
 ## Initialize the lab once (MacBook)
 
@@ -31,13 +31,13 @@ bash scripts/bootstrap-lab.sh
 
 This script clones the lab next to the harness, calls `flutter create` using
 the **installed official Flutter SDK**, runs baseline tests, commits and pushes
-`main`, then applies the test app to `app`, runs analyze/tests and pushes it.
+`main`, then creates and pushes `app` at the exact same clean commit.
 It never force-pushes or overwrites an existing `app` branch.
 
 If Flutter or Git credentials are missing, follow the actionable error and run
 the same command again after fixing the prerequisite.
 
-## Install in any Flutter project
+## Install in a newly created Flutter project
 
 ```bash
 # From your local flutter-harness clone:
@@ -46,7 +46,7 @@ bash scripts/install.sh /absolute/path/to/flutter-project mobile
 bash scripts/install.sh /absolute/path/to/flutter-project mobile-web
 ```
 
-The installer checks for Flutter in `pubspec.yaml` and adds only missing
+For v0, installation and testing target **only fresh SDK-generated Flutter projects**. Existing-project compatibility is explicitly deferred. The installer checks for Flutter in `pubspec.yaml` and adds only missing
 project files. It does not overwrite existing agent instructions, skills, or
 OpenCode configurations. If `opencode.json(c)` already exists, merge the
 selected `templates/opencode-*.jsonc` settings manually after inspecting it.
@@ -98,3 +98,5 @@ here; do not fork Superpowers merely to specialize Flutter behavior.
 - Project installation only creates the first OpenCode config or leaves an
   existing one untouched; no safe automatic JSONC merge yet.
 - This repo cannot build on your MacBook from GitHub; run the lab bootstrap locally.
+- Existing-project adoption, compatibility and migration are out of scope for v0.
+- Every independent harness evaluation should start from the clean lab `main` commit; the `app` branch is a development sandbox, not an installation-compatibility fixture.
