@@ -2,7 +2,13 @@
 
 ## Repositories
 - `flutter-harness`: shared tooling, installer, skills and scripts.
-- `flutter-harness-lab`: `main` is a Flutter SDK-generated default project; `app` is a minimal test application.
+- `flutter-harness-lab`: `main` is a Flutter SDK-generated default project; `app` initially points to the **same clean starter**. The agent implements test tasks on branches from the clean baseline and may grow `app` over time.
+
+## Initial scope
+- **Only new, clean Flutter SDK projects.** No adoption or migration of existing applications in v0.
+- Both lab branches are initially empty default projects. Do not prebuild a Task Manager or ship application-specific fixtures from the harness.
+- For reproducible evaluations, reset the working copy or branch from the exact clean `main` SHA, not a previously modified `app` branch.
+- The `app` branch is for observing agent-written functionality, not testing existing-project installation.
 
 ## Intended workflow
 1. User and agent agree on scope and acceptance criteria (Superpowers).
