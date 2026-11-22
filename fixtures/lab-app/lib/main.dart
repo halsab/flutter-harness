@@ -30,14 +30,14 @@ class _HarnessLabAppState extends State<HarnessLabApp> {
   final navigatorKey = GlobalKey<NavigatorState>();
 
   Future<void> addTask() async {
-    final controller = TextEditingController();
+    var draftTitle = '';
     final title = await showDialog<String>(
       context: navigatorKey.currentContext!,
       builder: (dialogContext) => AlertDialog(
         title: const Text('New task'),
         content: TextField(
           key: const Key('task-title'),
-          controller: controller,
+          onChanged: (value) => draftTitle = value,
           autofocus: true,
           decoration: const InputDecoration(labelText: 'Task title'),
         ),
@@ -48,13 +48,12 @@ class _HarnessLabAppState extends State<HarnessLabApp> {
           ),
           FilledButton(
             onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
+                Navigator.of(dialogContext).pop(draftTitle.trim()),
             child: const Text('Save'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (!mounted || title == null || title.isEmpty) return;
     setState(() => tasks.add(LabTask(nextId++, title)));
   }
