@@ -37,10 +37,14 @@ if [[ ! -f pubspec.yaml ]]; then
   cp "$ROOT/fixtures/lab-base/.github/workflows/flutter.yml" .github/workflows/flutter.yml
   git add -A
   git commit -m "test(lab): generate default Flutter project using SDK"
-  git push -u origin main
 else
   note "main already contains a Flutter project; not overwriting it."
 fi
+
+# Always push main, including after a previous run stopped at GitHub auth.
+# This is a safe fast-forward push; it never force-updates the remote branch.
+note "Synchronizing generated main branch with GitHub..."
+git push -u origin main
 
 if git show-ref --verify --quiet refs/heads/app || git ls-remote --exit-code --heads origin app >/dev/null 2>&1; then
   note "app branch already exists; preserving it."
