@@ -12,6 +12,13 @@ for cmd in git flutter dart xcodebuild xcrun adb java maestro opencode npx gh; d
   fi
 done
 
+JBR="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+if [[ -x "$JBR/bin/java" ]]; then
+  printf '\n== Android Studio bundled Java ==\n'
+  "$JBR/bin/java" -version 2>&1
+  printf 'For Flutter JDK selection run: bash scripts/setup-java.sh\n'
+fi
+
 if command -v flutter >/dev/null 2>&1; then
   printf '\n== flutter --version ==\n'
   flutter --version || true
