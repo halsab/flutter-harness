@@ -1,0 +1,33 @@
+name: Bootstrap quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-and-installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Bash syntax
+        run: |
+          set -euo pipefail
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+      - name: Smoke-test installer and idempotency
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          printf 'name: fixture\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$tmp/pubspec.yaml"
+          bash scripts/install.sh "$tmp" mobile
+          bash scripts/install.sh "$tmp" mobile
+          test -f "$tmp/opencode.jsonc"
+          test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
+          test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
+          grep -q '"profile": "mobile"' "$tmp/.flutter-harness/config.json"
