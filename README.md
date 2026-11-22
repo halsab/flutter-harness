@@ -17,6 +17,22 @@ Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 - Lab `main`: generated unmodified Flutter starter (Android, iOS, Web)
 - Lab `app`: initially identical clean Flutter starter; the agent grows it through tasks and PRs
 
+## Java setup on macOS (optional, before Android builds)
+
+If `flutter doctor` reports `Could not determine java version` but
+Android Studio's bundled JDK works, use the explicit setup script:
+
+```bash
+bash scripts/setup-java.sh
+```
+
+It selects `/Applications/Android Studio.app/Contents/jbr/Contents/Home`
+via `flutter config --jdk-dir`. It does **not** install another JDK or
+change the system `java` command, and does change the global Flutter JDK
+preference. Java 25 requires Gradle **9.1+** to run Gradle; the actual Android
+build must still be verified after generating the Flutter starter. Do not
+upgrade Gradle or the Android plugin without checking their compatibility.
+
 ## Initialize the lab once (MacBook)
 
 Prerequisites: Git, Flutter SDK on PATH, Git identity configured, and GitHub
