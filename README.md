@@ -53,6 +53,13 @@ It never force-pushes or overwrites an existing `app` branch.
 If Flutter or Git credentials are missing, follow the actionable error and run
 the same command again after fixing the prerequisite.
 
+If GitHub rejects a workflow file with `without workflow scope`, run
+`gh auth refresh -h github.com -s workflow`, then update your local harness
+checkout with `git pull --ff-only` and rerun `bash scripts/bootstrap-lab.sh`.
+The script resumes by pushing the already-created `main` commit **before**
+creating `app`. No manual reset or force push is needed.
+
+
 ## Install in a newly created Flutter project
 
 ```bash
