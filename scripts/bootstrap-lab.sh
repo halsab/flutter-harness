@@ -31,6 +31,7 @@ git pull --ff-only origin main
 if [[ ! -f pubspec.yaml ]]; then
   note "Creating the default Flutter SDK project (Android, iOS, Web)..."
   flutter create --project-name flutter_harness_lab --org dev.halsab --platforms=android,ios,web .
+  flutter analyze
   flutter test
   mkdir -p .github/workflows
   cp "$ROOT/fixtures/lab-base/.github/workflows/flutter.yml" .github/workflows/flutter.yml
@@ -47,18 +48,11 @@ if git show-ref --verify --quiet refs/heads/app || git ls-remote --exit-code --h
   exit 0
 fi
 
-note "Creating app branch and applying minimal test fixture..."
+note "Creating app branch from the same clean Flutter starter..."
 git switch -c app
-cp "$ROOT/fixtures/lab-app/lib/main.dart" lib/main.dart
-cp "$ROOT/fixtures/lab-app/test/widget_test.dart" test/widget_test.dart
-mkdir -p .maestro
-cp "$ROOT/fixtures/lab-app/.maestro/smoke.yaml" .maestro/smoke.yaml
-flutter analyze
-flutter test
-git add -A
-git commit -m "test(lab): add minimal task application and smoke tests"
 git push -u origin app
 
-note "SUCCESS: main = SDK default, app = test application."
+note "SUCCESS: main and app start from the same SDK-generated starter."
 note "Lab: $DEST"
-note "Next: run bash '$ROOT/scripts/install.sh' '$DEST' mobile-web"
+note "Use fresh branches from main for independent harness evaluations."
+note "Next: use bash '$ROOT/scripts/install.sh' '$DEST' mobile-web when testing installation."
