@@ -12,7 +12,7 @@ PROFILE="${3:-mobile}"
 command -v flutter >/dev/null 2>&1 || { echo "BLOCKED: flutter missing from PATH" >&2; exit 3; }
 command -v dart >/dev/null 2>&1 || { echo "BLOCKED: dart missing from PATH" >&2; exit 3; }
 PROJECT="$(cd "$PROJECT" && pwd -P)"
-LOG_DIR="$PROJECT/.flutter-harness/artifacts"
+LOG_DIR="${HARNESS_ARTIFACTS_DIR:-${HOME}/.cache/flutter-harness/$(basename "$PROJECT")}"
 mkdir -p "$LOG_DIR"
 ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 LOG="$LOG_DIR/check-$ID.log"
