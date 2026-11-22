@@ -9,7 +9,7 @@ Use Superpowers for planning, TDD, debugging and review; use official Flutter/Da
 
 ## Workflow
 
-1. Inspect the existing project's code and architecture. Read `.flutter-harness/config.json`; do not assume that Web is enabled.
+1. For v0, start from a newly created default Flutter SDK project. Inspect its baseline and read `.flutter-harness/config.json`; do not assume Web is enabled. Do not attempt legacy-project migration or retrofit.
 2. Agree scope and acceptance criteria with the human, then create a feature branch before implementation. Never commit to main.
 3. Implement in small, verified increments, committing each meaningful milestone.
 4. Prefer official Flutter/Dart commands and the harness scripts over ad hoc shell commands.
