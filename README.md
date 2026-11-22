@@ -1,9 +1,9 @@
 # Flutter Harness
 
 An experimental, open-source, script-first development harness for Flutter:
-Android + iOS, with optional Flutter Web. Built on upstream
-[Superpowers](https://github.com/obra/superpowers), official Flutter/Dart AI tooling,
-Maestro for mobile UI, and Playwright for optional Web E2E.
+Android + iOS, with optional Flutter Web. Uses a first-party, short-prompt
+agent workflow, official Flutter/Dart AI tooling, Maestro for mobile UI,
+and Playwright for optional Web E2E.
 
 **Status: local bootstrap validated (November 2026), end-to-end agent feature trial pending.**
 The SDK starter has run on an Android emulator, iOS Simulator and Chrome on
@@ -78,8 +78,12 @@ project files. It does not overwrite existing agent instructions, skills, or
 OpenCode configurations. If `opencode.json(c)` already exists, merge the
 selected `templates/opencode-*.jsonc` settings manually after inspecting it.
 
-Current OpenCode adapter targets **OpenCode V2** and pins Superpowers to
-`v7.0.2`. MCP binaries (`dart`, `maestro`) must exist locally.
+Current OpenCode adapter targets **OpenCode V2**. The default profile does **not**
+load Superpowers: its `brainstorming` skill requires an explicit design-approval
+turn even for a small feature, which blocked the first short-prompt lab trial.
+Superpowers remains an optional **interactive** design workflow, but its
+approval gate must not be silently bypassed. MCP binaries (`dart`, `maestro`)
+must exist locally.
 For Web, Node/npm and browser tools are also required. The pinned Playwright
 and Chrome DevTools MCP servers have responded to basic local tool calls;
 full automated browser E2E has not yet been proven.
@@ -129,19 +133,27 @@ tests; the lab additionally validates its own OpenCode config.
 
 ## Intended agent workflow
 
-1. The developer and agent agree on the requirement and acceptance criteria.
-2. The agent creates a feature branch and implementation plan.
+1. The developer gives a short outcome-oriented request; the agent derives
+   acceptance criteria and chooses routine implementation defaults itself.
+   It asks only when a missing answer changes the requested behavior or a
+   protected operation needs approval.
+2. The agent creates a feature branch and concise implementation plan.
 3. The agent implements in small verified steps, committing each milestone.
 4. Deterministic scripts and tools verify the app. Failures are fixed and
    verified again. No golden baselines are accepted without the owner.
 5. The agent pushes the branch and opens a PR with evidence. **The owner merges.**
 
 See [architecture](docs/ARCHITECTURE.md). Skills and templates are versioned
-here; do not fork Superpowers merely to specialize Flutter behavior.
+here; do not silently modify or bypass a third-party skill's approval policy.
+A single `opencode run` is one turn, not an unattended worker: permission prompts
+(e.g. a Git push) may still require interactive approval.
 
 ## Known gaps
 
 - No Dart orchestration CLI yet; bootstrap scripts use Bash.
+- The first short-prompt lab trial reached an unnecessary design-approval gate
+  and stopped before implementation. The default autonomous profile now omits
+  that gate; a full feature PR must still validate the change end-to-end.
 - Android/iOS simulator runtime, basic Dart/Maestro/Xcode/browser MCP calls
   have been verified manually, but repeatable device E2E, full agent feature
   development and golden baseline approval are **not yet** automated.
