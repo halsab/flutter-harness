@@ -24,7 +24,7 @@
         "command": [
           "npx",
           "--yes",
-          "@playwright/mcp"
+          "@playwright/mcp@0.0.86"
         ]
       },
       "chrome-devtools": {
@@ -32,7 +32,7 @@
         "command": [
           "npx",
           "--yes",
-          "chrome-devtools-mcp"
+          "chrome-devtools-mcp@1.13.0"
         ]
       }
     }
