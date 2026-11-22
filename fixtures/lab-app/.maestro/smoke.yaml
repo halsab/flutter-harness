@@ -1,0 +1,12 @@
+appId: dev.halsab.flutter_harness_lab
+---
+- launchApp
+- assertVisible: "Harness Lab"
+- assertVisible: "Inspect harness"
+- tapOn:
+    id: "add-task"
+- assertVisible: "New task"
+- tapOn: "Task title"
+- inputText: "Maestro smoke task"
+- tapOn: "Save"
+- assertVisible: "Maestro smoke task"
