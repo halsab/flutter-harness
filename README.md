@@ -98,7 +98,7 @@ bash scripts/check.sh /absolute/path/to/flutter-project full mobile-web
 
 The bootstrap verifier reports format, analyzer, Flutter tests and optional
 full builds. It writes logs and TSV summaries inside
-`.flutter-harness/artifacts`. **It does not yet run Maestro, Web E2E or live
+`~/.cache/flutter-harness/<project-name>/` by default (or `HARNESS_ARTIFACTS_DIR`). This keeps the clean lab worktree untouched. **It does not yet run Maestro, Web E2E or live
 Dart MCP diagnostics**. Those are planned.
 
 ## Intended agent workflow
