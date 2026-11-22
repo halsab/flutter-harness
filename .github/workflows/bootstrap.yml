@@ -20,14 +20,21 @@ jobs:
           for script in scripts/*.sh; do
             bash -n "$script"
           done
+      - name: Validate model routing and permissions
+        run: |
+          python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
+          python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
       - name: Smoke-test installer and idempotency
         run: |
           set -euo pipefail
-          tmp="$(mktemp -d)"
-          printf 'name: fixture\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$tmp/pubspec.yaml"
-          bash scripts/install.sh "$tmp" mobile
-          bash scripts/install.sh "$tmp" mobile
-          test -f "$tmp/opencode.jsonc"
-          test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
-          test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
-          grep -q '"profile": "mobile"' "$tmp/.flutter-harness/config.json"
+          for profile in mobile mobile-web; do
+            tmp="$(mktemp -d)"
+            printf 'name: fixture\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$tmp/pubspec.yaml"
+            bash scripts/install.sh "$tmp" "$profile"
+            bash scripts/install.sh "$tmp" "$profile"
+            test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
+            test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
+            grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
+            python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
+            rm -rf "$tmp"
+          done
