@@ -5,8 +5,12 @@ Android + iOS, with optional Flutter Web. Built on upstream
 [Superpowers](https://github.com/obra/superpowers), official Flutter/Dart AI tooling,
 Maestro for mobile UI, and Playwright for optional Web E2E.
 
-**Status: bootstrap / unvalidated on device.** This is not yet a production-ready
-autonomous development system. Local Flutter SDK verification is pending.
+**Status: local bootstrap validated (November 2026), end-to-end agent feature trial pending.**
+The SDK starter has run on an Android emulator, iOS Simulator and Chrome on
+the owner's MacBook. Flutter quick/standard/full checks and basic MCP
+connectivity were exercised locally. This is **not** yet a production-ready
+autonomous development system; reproducible device UI flows and a complete
+agent-authored feature PR remain to be validated.
 
 Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 
@@ -76,8 +80,9 @@ selected `templates/opencode-*.jsonc` settings manually after inspecting it.
 
 Current OpenCode adapter targets **OpenCode V2** and pins Superpowers to
 `v7.0.2`. MCP binaries (`dart`, `maestro`) must exist locally.
-For Web, Node/npm and browser tools are also required; Web MCP dependencies
-are version-pinned but not yet integration-tested on the owner's MacBook.
+For Web, Node/npm and browser tools are also required. The pinned Playwright
+and Chrome DevTools MCP servers have responded to basic local tool calls;
+full automated browser E2E has not yet been proven.
 
 Official Flutter skills can be installed using Flutter's published commands
 from the Flutter project root:
@@ -98,8 +103,29 @@ bash scripts/check.sh /absolute/path/to/flutter-project full mobile-web
 
 The bootstrap verifier reports format, analyzer, Flutter tests and optional
 full builds. It writes logs and TSV summaries inside
-`~/.cache/flutter-harness/<project-name>/` by default (or `HARNESS_ARTIFACTS_DIR`). This keeps the clean lab worktree untouched. **It does not yet run Maestro, Web E2E or live
-Dart MCP diagnostics**. Those are planned.
+`~/.cache/flutter-harness/<project-name>/` by default (or `HARNESS_ARTIFACTS_DIR`). This keeps the clean lab worktree untouched. **It does not run Maestro UI flows, Web E2E or Dart MCP diagnostics**;
+those are separate local checks. The script's full level builds Android APK,
+iOS Simulator (on macOS) and Web for the mobile-web profile.
+
+## Models, permissions and verification
+
+OpenCode V2 routes implementation and routine work to GPT-6 Luna and planning,
+architecture and focused review to GPT-6.2 Sol (medium reasoning). See the
+[model routing and safety guide](docs/model-routing.md). Templates contain no
+credentials; authorize your provider locally.
+
+The templates ask before accessing paths outside the project, ask before Git
+pushes and GitHub API operations, and deny direct `gh pr merge` and common
+force-push or publishing commands. **These are guardrails, not a sandbox:**
+shell patterns and MCP tools can have effects beyond command matching. Enable
+GitHub branch protection on the lab's `main` and `app` branches and review
+every PR before merging.
+
+Run `python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile`
+and `python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web`
+to check configured models, roles, permissions and MCP lists without using
+model tokens. GitHub Actions runs the same validation and installer smoke
+tests; the lab additionally validates its own OpenCode config.
 
 ## Intended agent workflow
 
@@ -116,8 +142,9 @@ here; do not fork Superpowers merely to specialize Flutter behavior.
 ## Known gaps
 
 - No Dart orchestration CLI yet; bootstrap scripts use Bash.
-- No tested simulator runtime/DTD lifecycle, Maestro MCP, full E2E, or golden
-  approval UI yet.
+- Android/iOS simulator runtime, basic Dart/Maestro/Xcode/browser MCP calls
+  have been verified manually, but repeatable device E2E, full agent feature
+  development and golden baseline approval are **not yet** automated.
 - Project installation only creates the first OpenCode config or leaves an
   existing one untouched; no safe automatic JSONC merge yet.
 - This repo cannot build on your MacBook from GitHub; run the lab bootstrap locally.
