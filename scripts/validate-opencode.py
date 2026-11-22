@@ -88,8 +88,8 @@ def validate(filename, profile):
         ensure(servers["playwright"].get("command") == ["npx", "--yes", "@playwright/mcp@0.0.86"], "Playwright pin changed")
         ensure(servers["chrome-devtools"].get("command") == ["npx", "--yes", "chrome-devtools-mcp@1.13.0"], "Chrome DevTools pin changed")
     ensure(
-        data.get("plugins") == ["superpowers@git+https://github.com/obra/superpowers.git#v7.0.2"],
-        "Superpowers version changed",
+        data.get("plugins") == [],
+        "autonomous profile must not force the Superpowers brainstorming approval gate",
     )
     print(f"PASS OpenCode {profile}: {filename}")
 
