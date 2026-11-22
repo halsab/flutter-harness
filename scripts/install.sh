@@ -35,7 +35,7 @@ fi
 
 if [[ ! -e "$TARGET/opencode.json" && ! -e "$TARGET/opencode.jsonc" ]]; then
   cp "$ROOT/templates/opencode-${PROFILE}.jsonc" "$TARGET/opencode.jsonc"
-  info "Created OpenCode V2 config with Superpowers and MCP servers."
+  info "Created autonomous OpenCode V2 config with MCP servers."
 else
   info "Preserved existing OpenCode config. Merge with templates/opencode-${PROFILE}.jsonc manually."
 fi
@@ -48,8 +48,10 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
-Use Superpowers for planning, execution and review. Work in feature branches,
-commit verified milestones, open pull requests; never merge automatically.
+Make routine implementation decisions autonomously from short feature requests;
+ask only for material ambiguity or protected actions. Plan, test, review,
+work in feature branches, commit verified milestones, open pull requests;
+never merge automatically.
 Respect OpenCode model routing and permission prompts; do not bypass denied actions.
 Only the human can approve updates to golden image baselines.
 Report PASS / FAIL / BLOCKED / SKIPPED accurately.
