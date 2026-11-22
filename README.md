@@ -54,7 +54,7 @@ selected `templates/opencode-*.jsonc` settings manually after inspecting it.
 Current OpenCode adapter targets **OpenCode V2** and pins Superpowers to
 `v7.0.2`. MCP binaries (`dart`, `maestro`) must exist locally.
 For Web, Node/npm and browser tools are also required; Web MCP dependencies
-are not yet pinned or integration-tested.
+are version-pinned but not yet integration-tested on the owner's MacBook.
 
 Official Flutter skills can be installed using Flutter's published commands
 from the Flutter project root:
