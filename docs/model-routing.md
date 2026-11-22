@@ -26,3 +26,39 @@ The initial setup is **not** a hard spending or usage cap. The subscription has 
 Model identifiers used by this profile: `openai/gpt-6.2-sol` and `openai/gpt-6-luna`. Reasoning variants are selected with `#low`, `#medium` or `#high` on agent model references. No authentication tokens belong in this repository.
 
 Reference: https://opencode.ai/docs/agents, https://opencode.ai/docs/models, https://opencode.ai/docs/providers.
+
+## Safety and approval boundaries
+
+- Each project's OpenCode V2 `permissions` rules ask before access outside
+  its workspace or worktree and before `git push` / `gh api` operations.
+- The common `gh pr merge` command, force-push patterns, releases and
+  `flutter pub publish` are denied by project policy. Project owner merges PRs
+  in GitHub after review.
+- `architect` and `reviewer` deny edits and all shell commands by default;
+  they allow only read-only `git status`, `git diff`, `git show` and
+  `git log`. Routine test execution belongs to `build`.
+- These rules **are not a security sandbox**. Shell argument parsing is
+  best-effort; alternate commands, APIs and external MCP tools may mutate
+  state. Never treat a `deny` rule as a substitute for human approval or
+  repository-side branch protection. Do not evade a denied operation.
+- Enable branch protection/rulesets for the lab's `main` and `app` branches
+  in GitHub Settings → Rules → Rulesets (or Branches). Block force pushes,
+  require PRs and the relevant passing CI check. These settings may require
+  manual repository administration and are not applied by this template.
+
+## Automated checks
+
+From the `flutter-harness` repository root:
+
+```bash
+python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
+python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
+```
+
+The checks use Python's standard library and **do not call any LLM**. The
+harness CI checks both profiles and installs each twice to test idempotency.
+The lab CI checks its own agent/model/permission configuration. CI cannot
+validate real ChatGPT authentication, the currently selected session model,
+reasoning effort accepted by a provider, or subagent handoff: test those in a
+new local OpenCode session with actual tool output. Keep the Sol default at
+medium and avoid repeatedly launching unnecessary review subagents.
