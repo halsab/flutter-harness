@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    "superpowers@git+https://github.com/obra/superpowers.git#v7.0.2"
+  ],
+  "mcp": {
+    "servers": {
+      "dart": {
+        "type": "local",
+        "command": [
+          "dart",
+          "mcp-server"
+        ]
+      },
+      "maestro": {
+        "type": "local",
+        "command": [
+          "maestro",
+          "mcp"
+        ]
+      }
+    }
+  }
+}
