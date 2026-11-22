@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Check Flutter Harness OpenCode V2 routing and safeguards (stdlib only)."""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+SOL = "openai/gpt-6.2-sol"
+LUNA = "openai/gpt-6-luna"
+ROLES = {
+    "build": f"{LUNA}#high",
+    "plan": f"{SOL}#medium",
+    "architect": f"{SOL}#medium",
+    "reviewer": f"{SOL}#medium",
+    "general": f"{LUNA}#medium",
+    "explore": f"{LUNA}#low",
+    "compaction": f"{LUNA}#low",
+    "title": f"{LUNA}#low",
+    "summary": f"{LUNA}#low",
+}
+REQUIRED_SAFETY = {
+    ("external_directory", "*", "ask"),
+    ("shell", "git push *", "ask"),
+    ("shell", "git push --force*", "deny"),
+    ("shell", "git push -f *", "deny"),
+    ("shell", "gh pr merge *", "deny"),
+    ("shell", "gh api *", "ask"),
+    ("shell", "gh release create *", "deny"),
+    ("shell", "flutter pub publish *", "deny"),
+}
+REVIEW_READONLY = {
+    ("edit", "*", "deny"),
+    ("shell", "*", "deny"),
+    ("shell", "git status *", "allow"),
+    ("shell", "git diff *", "allow"),
+    ("shell", "git show *", "allow"),
+    ("shell", "git log *", "allow"),
+}
+
+
+def ensure(value, message):
+    if not value:
+        raise ValueError(message)
+
+
+def ruleset(rules):
+    ensure(isinstance(rules, list), "permissions must be an ordered list")
+    for rule in rules:
+        ensure(isinstance(rule, dict), "permission entry must be an object")
+        ensure(
+            all(isinstance(rule.get(key), str) for key in ("action", "resource", "effect")),
+            "permission entry must contain action/resource/effect strings",
+        )
+    return {(r["action"], r["resource"], r["effect"]) for r in rules}
+
+
+def validate(filename, profile):
+    data = json.loads(Path(filename).read_text(encoding="utf-8"))
+    ensure(data.get("model") == LUNA, "default model must be Luna")
+    ensure(data.get("default_agent") == "build", "default agent must be build")
+
+    agents = data.get("agents", {})
+    for name, model in ROLES.items():
+        ensure(agents.get(name, {}).get("model") == model, f"wrong model/effort: {name}")
+    for name in ("architect", "reviewer"):
+        subagent = agents[name]
+        ensure(subagent.get("mode") == "subagent", f"{name} must be a subagent")
+        ensure(REVIEW_READONLY <= ruleset(subagent.get("permissions")), f"{name} isn't read-only")
+
+    ensure(REQUIRED_SAFETY <= ruleset(data.get("permissions")), "missing safety permissions")
+
+    provider = data.get("providers", {}).get("openai", {}).get("models", {})
+    for name, effort in (("gpt-6.2-sol", "medium"), ("gpt-6-luna", "high")):
+        ensure(
+            provider.get(name, {}).get("settings", {}).get("reasoningEffort") == effort,
+            f"wrong model default effort: {name}",
+        )
+
+    servers = data.get("mcp", {}).get("servers", {})
+    expected = {"dart", "maestro"}
+    if profile == "mobile-web":
+        expected |= {"playwright", "chrome-devtools"}
+    ensure(set(servers) == expected, f"{profile} MCP servers must be {sorted(expected)}")
+    ensure(servers["dart"].get("command") == ["dart", "mcp-server"], "Dart MCP command changed")
+    ensure(servers["maestro"].get("command") == ["maestro", "mcp"], "Maestro MCP command changed")
+    if profile == "mobile-web":
+        ensure(servers["playwright"].get("command") == ["npx", "--yes", "@playwright/mcp@0.0.86"], "Playwright pin changed")
+        ensure(servers["chrome-devtools"].get("command") == ["npx", "--yes", "chrome-devtools-mcp@1.13.0"], "Chrome DevTools pin changed")
+    ensure(
+        data.get("plugins") == ["superpowers@git+https://github.com/obra/superpowers.git#v7.0.2"],
+        "Superpowers version changed",
+    )
+    print(f"PASS OpenCode {profile}: {filename}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("file", type=Path)
+    parser.add_argument("profile", choices=("mobile", "mobile-web"))
+    args = parser.parse_args()
+    try:
+        validate(args.file, args.profile)
+    except (ValueError, OSError) as error:
+        print(f"FAIL OpenCode {args.file}: {error}", file=sys.stderr)
+        sys.exit(1)
