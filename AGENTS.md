@@ -12,3 +12,5 @@ This repository contains the harness, not the user's Flutter application.
 - Mobile is the default profile. Flutter Web is optional.
 - Treat a BLOCKED check as not verified; report the exact missing prerequisite.
 - The lab project is separate: https://github.com/halsab/flutter-harness-lab.
+- Model and permission rules are versioned in both OpenCode profile templates; do not bypass denied tool operations.
+- Ask approval before external-directory access or Git pushes; never mistake CLI prompts for GitHub branch protection.
