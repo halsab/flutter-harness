@@ -11,7 +11,7 @@
 - The `app` branch is for observing agent-written functionality, not testing existing-project installation.
 
 ## Intended workflow
-1. User and agent agree on scope and acceptance criteria (Superpowers).
+1. User states an outcome in plain language; agent derives acceptance criteria and chooses routine implementation defaults without confirmation. Ask only about material product ambiguity or protected operations.
 2. Agent creates a feature branch, records a plan, and changes code in small verified steps.
 3. Agent commits each meaningful checkpoint.
 4. Agent runs relevant static, unit/widget and runtime/E2E checks.
@@ -31,6 +31,7 @@
 - No self-hosted runner on the owner's MacBook in v0.
 - Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
 - Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
+- A default autonomous profile must not load the interactive Superpowers brainstorming approval gate. Interactive design remains opt-in, not an implied prerequisite of small feature work.
 - Tools may be visible per selected profile, while skill instructions are loaded as needed.
 
 ## Development status
@@ -40,6 +41,11 @@ model routing, and CI validation are implemented. The owner has verified a
 default Flutter project on Android emulator, iOS Simulator and Chrome, basic
 Dart/Maestro/Playwright/Chrome DevTools/Xcode MCP calls, and Sol/Luna model
 responses. These are *manual* checks, not repeatable device E2E tests.
+
+The initial short-prompt feature trial stopped at an unnecessary interactive
+Superpowers brainstorming approval step; the default workflow was adjusted to
+choose routine technical defaults autonomously. This behavior still needs a
+complete rerun after merging the change.
 
 Remaining milestones: complete agent-authored feature implementation and PR,
 reusable Maestro/Playwright flows with evidence, golden approval process, and
