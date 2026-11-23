@@ -16,40 +16,21 @@ is not part of the default experience.
 | Explicit manual planning | `plan` | GPT-6.2 Sol | medium |
 | Title, summary, compaction | maintenance agents | GPT-6 Luna | low |
 
-The autonomous default does **not** force an architect consultation for
-simple CRUD features. Use `reviewer` once with a fresh subagent context: pass
-requirements and changed code, without the author's self-assessment. Request
-concrete failing scenarios and evidence, not a numerical score or generic
-style complaints. `build` fixes confirmed important issues and can request
-**one targeted recheck** of a high-risk correction. Do not start a five-round
-review loop by default. Scope the review to the full task diff against the
-integration branch's merge base, plus task-related uncommitted and untracked
-files; `git diff HEAD` alone misses earlier task commits. Require a location,
-realistic failure scenario, impact and evidence for every accepted finding.
-Mark review OPEN if material findings or relevant failed checks remain; do not
-mislabel a blocked platform test as a pass. Reviewer shell is deliberately
-read-only: run `git status --short`, `git merge-base app HEAD`, and
-`git diff --no-ext-diff <literal-base-sha>` as **separate** calls; use
-`read` to inspect files rather than `cat`. Chaining with `&&`, `;`
-or `$(...)` matches neither the safe whitelist nor the review contract.
-If any relevant diff/new file is inaccessible, report review **OPEN**, not
-PASSED. Do not grant `shell *` to workaround denied commands.
+The autonomous default does not force an architect consultation or
+independent reviewer for simple features. The implementer checks the diff once,
+and the standard deterministic Flutter tests/analyzer supply ordinary
+verification. Call a fresh read-only Luna reviewer only for material security,
+privacy, data migration, architecture or concurrency risk, or explicit request.
+If called, supply requirements and the complete task diff, ask for concrete
+failure scenarios and do at most one targeted recheck for an important fix.
+Never run a repetitive review/fix loop.
 
-For large unfamiliar codebases, use one read-only `explore` (Luna low) request
-for a concise map of file paths, key symbols, callers and relevant tests. The
-implementer verifies cited code. Skip this delegation for small/focused tasks.
-
-This adapts the useful independent-review principle from
-[Loop Code Review](https://github.com/di-sukharev/loop-code-review-skill)
-without installing its repeated reviewer/fixer loop. The original skill's
-up-to-five rounds and strong high-effort model for stored-data changes would
-increase usage and conflict with our read-only reviewer. The related
-[Code Scout](https://github.com/di-sukharev/code-scout-skill) is helpful only
-when locating code in a large/unfamiliar repository; for a tiny Flutter app,
-one extra subagent can cost more than it saves. The author's
-[Orchestration](https://github.com/di-sukharev/orchestration-skill) and
-[Refactoring](https://github.com/di-sukharev/refactoring-skill) use expensive
-multi-agent loops and remain optional.
+If the read-only reviewer is needed, use separate whitelisted git status,
+git merge-base and git diff calls, with literal SHAs, and read files via read.
+Denials or unavailable changes make review OPEN. Avoid expanding shell access.
+Explore/architect subagents are optional for genuinely unfamiliar or complex
+problems, not default steps. A simple UI filter does not justify specialist
+delegation or high-reasoning escalation.
 
 ## Interactive design versus autonomous delivery
 
@@ -67,50 +48,34 @@ profile, inspect `opencode debug config` and verify the effective plugin
 and skill set in a **new session**. Static CI cannot demonstrate that a
 previously running session has unloaded the old plugin.
 
-## Tools and context budget
+## Tools, testing and context budget
 
-- For Web Playwright, use `web-preview.py` to compile and serve `build/web` on a loopback port without Chrome's debug-service handshake. HTTP READY is not a UI PASS. Run all platforms independently and gate final DONE on the platform verification report. An incomplete report permits only a draft PR with explicit limitations.
-- Discover Android and iOS devices first (`flutter devices`, Maestro device listing;
-  on macOS check `xcrun simctl list devices booted`). A booted iOS Simulator
-  must receive a Maestro UI scenario for any relevant mobile feature even if
-  the Android flow already passed. If unavailable, document iOS BLOCKED and
-  the concrete reason; an iOS build is separate evidence. Use **Playwright**
-  for Flutter Web. Do not spend dozens of attempts trying Maestro Web text
-  selectors or unsupported keyboard commands.
-- Assert the **exact expected persisted result** after relaunch. If a typing
-  operation accidentally duplicates a suffix, fix the input action and rerun;
-  never replace an expected value with the observed wrong value to make a test pass.
-- Report separate Android/iOS/Web statuses, target IDs, key assertions and
-  evidence. Distinguish a successful build, UI test and unavailable platform.
-- Chrome DevTools MCP remains configured but `disabled: true` by default.
-  Enable it temporarily only when Playwright cannot diagnose a browser bug.
-- For a repeated failing tool command, stop after two attempts at the same
-  approach, inspect a small diagnostic and change strategy or report a blocker.
-- Minimize large search outputs, repeated config dumps, simultaneous MCP
-  discovery, long plans and unnecessary full-codebase reviews. The model
-  processes tool outputs in context. The MCP server itself is not necessarily
-  a separate paid LLM call.
-- These are **soft usage preferences**, not token, money or call caps. A
-  cheaper model can also spend more total tokens if it loops; compare
-  observed results rather than assuming exact savings.
+Default on ordinary features: run check.sh standard once after implementation,
+covering format, analyze and fast Dart unit/widget tests. Add tests only for
+important logic and stateful observable behavior. Routine changes do not
+require device/browser E2E or a separate reviewer.
 
-Use the stdlib-only session reporter in the harness repository:
+Only when concrete risk demands it, run the smallest executable integration
+scenario on relevant platform(s); never automatically all Android/iOS/Web.
+Use test assertions and runner exit statuses rather than agent visual opinions.
+For Web Playwright, the optional web-preview.py serves a built app locally.
+Do not confuse build/server READY with a UI PASS.
 
-```bash
-opencode session export SESSION_ID --sanitize > /tmp/parent.json
-python3 scripts/session-usage.py /tmp/parent.json /tmp/child.json
-```
+Establish known initial state and validate results before diagnosing UI
+failures. In the third trial the newly added active task was hidden behind
+the Completed filter. Repeating clipboard/input tools was unnecessary.
+If UI input fails, allow one focused diagnosis and one changed attempt,
+then report BLOCKED without long retry loops.
 
-Include exports of child sessions to account for delegated models. The
-report lists raw input/output/reasoning/cache counters, calls to tools, and
-agent/model variants. It is not a monetary bill or an exact context-window
-cost. Keep exports out of git. Individual invocations and reasoning efforts
-must be checked in actual session exports; static config tests only verify
-declared defaults. A GUI-selected OpenCode variant can persist per session;
-the second lab trial's `build` export used Luna **high** despite a project
-default of **medium**. Confirm the displayed variant in a **new** interactive
-session before testing. Do not attribute High usage to the Harness default
-without checking the active session.
+The former verify-e2e.py helper is optional for explicitly requested
+all-platform tests; no verification.json is required for ordinary PRs.
+Optional E2E NOT RUN is not a blocker. Failed required high-risk checks
+or unresolved material review findings require Draft PRs.
+
+Keep MCP discovery bounded, skip whole-project searches for small changes,
+and avoid repeated full-codebase reviews. Usage limits are preferences, not
+hard enforced model caps. Inspect real session exports to measure overhead.
+See docs/verification-policy.md for the risk matrix.
 
 ## GitHub and authorization
 

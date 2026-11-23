@@ -6,7 +6,7 @@ autonomous workflow, official Flutter/Dart AI tooling, Maestro for mobile UI,
 and Playwright for Web. Upstream [Superpowers](https://github.com/obra/superpowers)
 remains optional for interactive design sessions.
 
-**Status: experimental (November 2026); second autonomous lab trial complete.**
+**Status: experimental (November 2026); lean verification policy under evaluation.**
 The SDK starter has run on an Android emulator, iOS Simulator and Chrome on
 the owner's MacBook. Flutter quick/standard/full checks and MCP
 connectivity were exercised locally. The autonomous trial for editing task
@@ -116,40 +116,38 @@ full builds. It writes logs and TSV summaries inside
 those are separate local checks. The script's full level builds Android APK,
 iOS Simulator (on macOS) and Web for the mobile-web profile.
 
-## Deterministic Web Playwright E2E and platform evidence
+## Lean risk-based testing (default)
 
-For the `mobile-web` profile, run Playwright against a local **release
-build** instead of the Flutter/Chrome debug-service connection:
+Ordinary feature: one standard Flutter check (format, analyzer, flutter test),
+then one quick diff self-review and PR. Focused Dart unit tests cover business
+rules, validation, persistence and error paths. Selective widget tests cover
+meaningful UI state such as filters and form validation. Do not add tests for
+trivial labels, styling, boilerplate or arbitrary coverage thresholds.
 
-```sh
-python3 .flutter-harness/bin/web-preview.py start
-# Playwright MCP navigates to the printed READY URL and exercises real UI
-python3 .flutter-harness/bin/web-preview.py status
-python3 .flutter-harness/bin/web-preview.py stop
-```
+No mandatory all-platform Android/iOS/Web E2E, no compulsory separate reviewer,
+and no agent-driven exploratory screenshot inspection for routine features.
+Integration tests are reserved for real device/platform dependencies,
+security/payment/data-loss or explicitly requested acceptance criteria.
+Prefer committed executable tests and meaningful assertions, not agent claims.
+Only test the platform(s) relevant to that risk. Missing OPTIONAL E2E is
+NOT RUN (not required), not a reason to create a Draft PR. A failed REQUIRED
+high-risk check keeps the PR Draft.
 
-The helper builds with local Web resources, launches a Python HTTP server bound
-to `127.0.0.1` on an available port, and writes logs/state outside the
-repository under `~/.cache/flutter-harness`. Flutter officially supports
-serving `build/web` via a local HTTP server:
-https://docs.flutter.dev/deployment/web .
-**HTTP READY is not E2E PASS**; only successful Playwright UI assertions are.
+The optional Web preview utility can serve a compiled Flutter Web app without
+Chrome's debug-service connection:
 
-Run Android Maestro, iOS Maestro and Web Playwright independently; a failure
-on one platform never excuses skipping the others. Before preparing a PR,
-write `.flutter-harness/verification.json` with Android/iOS/Web outcomes.
-Each PASS needs `status`, `target`, `tool`, `assertions`, and a concrete
-`evidence` reference. BLOCKED, FAIL and SKIPPED need `reason`.
+    python3 .flutter-harness/bin/web-preview.py start
+    # Optional browser scenario using Playwright
+    python3 .flutter-harness/bin/web-preview.py stop
 
-```sh
-python3 .flutter-harness/bin/verify-e2e.py .flutter-harness/verification.json --profile mobile-web
-```
+The old verify-e2e.py is available only when an explicitly requested
+all-platform scenario needs a completeness checklist. It does not prove
+execution independently and is not part of default PR gating.
 
-A missing or unverified platform causes INCOMPLETE: the agent may open a
-**draft PR** documenting blockers, never claim finished verified delivery.
-The gate checks report completeness, not whether the agent's references
-actually prove execution; audit the OpenCode session logs for that. The
-installer ignores Playwright snapshots and local verification reports in Git.
+See docs/verification-policy.md for the concise risk matrix and the lesson
+from the filter incident: a task hidden by Completed was wrongly classified
+as an unsuccessful add by the agent. Explicit initial state and test
+postconditions prevent that class of false failure.
 
 ## Models, permissions and verification
 
@@ -176,39 +174,23 @@ tests; the lab additionally validates its own OpenCode config.
 
 ## Default short-prompt workflow
 
-1. The developer requests a feature in plain language. The agent asks only if
-   a material business, privacy or architecture choice is unclear (e.g. local
-   versus cloud data). When needed, **one** concise design signoff suffices.
-2. The agent creates a feature branch in the current checkout and plans
-   internally. **No second approval of a technical plan, no worktree choice,
-   and no execution-mode choice.**
-3. The agent implements with targeted tests, verifies Flutter analysis/tests,
-   discovers both Android and iOS devices, runs affected Maestro UI scenarios
-   on available Android **and** iOS targets, and verifies Web with Playwright.
-   It checks exact intended post-action state rather than accepting accidental
-   duplicate text. Builds are not UI tests. It records a separate
-   PASS / FAIL / BLOCKED / SKIPPED result per platform, with evidence.
-4. The agent performs **one** focused Luna reviewer pass on the complete
-   diff; the reviewer uses separate whitelisted read-only Git commands,
-   and reports OPEN if diff coverage is incomplete. Fix confirmed
-   important issues and self-check affected behavior. Escalate to Sol only
-   for significant technical complexity.
-5. The agent commits, requests push approval as required, and **creates the
-   PR automatically**. If push is denied, report BLOCKED rather than claiming
-   the feature is delivered. **Only the owner merges.**
+1. Ask for a feature using plain language. The agent resolves minor technical
+   details independently and asks only material product/security questions.
+2. Implement on a feature branch without repetitive planning or worktree gates.
+3. Add only necessary unit/widget tests, run one standard code check and
+   inspect the task diff once. Use specialized reviewer/device E2E only for
+   genuine risk, not by default. The CI repeats deterministic code checks.
+4. Commit and push with the required permission, create/update one PR into
+   the integration branch; owner reviews and merges. If a required check or
+   material issue is unresolved, keep the PR Draft. Do not claim unrun tests.
 
-OpenCode is used interactively (`opencode`) for material decisions and tool
-approvals. `opencode run` is a single turn and may stop when approval is
-required. Any local `opencode.jsonc` changes must be preserved and excluded
-from unrelated feature commits.
+This workflow keeps the implementation phase dominant over testing/review and
+avoids repeated UI tool debugging on small application features.
 
-`mobile-web` config includes a disabled Chrome DevTools MCP entry; enable
-it temporarily for unusual browser diagnostics. The regular Web tool is
-Playwright, while Maestro is for mobile devices. Extra MCP tool schemas
-consume model context even when not called.
-
-See [architecture](docs/ARCHITECTURE.md). Skills and templates are versioned
-here; upstream Superpowers is not forked or silently overridden.
+OpenCode remains interactive for material decisions and push approvals.
+Its configuration may be overridden by an already selected model variant,
+so usage should be checked from session exports rather than inferred from
+the project default.
 
 ## Measure usage without model calls
 
@@ -227,23 +209,24 @@ separate paid model invocation by default. Do not commit exports.
 
 ## Known gaps
 
-- No Dart orchestration CLI yet; bootstrap scripts use Bash.
-- The first lab feature PR (#5) exposed repeated agent approval and review
-  loops. The subsequent autonomous title-edit PR (#6) reached GitHub with
-  passing CI and actual Android Maestro/Web Playwright calls, but skipped iOS
-  Maestro and had three read-only reviewer command denials. These targeted
-  fixes require another local end-to-end trial; no claim of proof until then.
-- Project installation only creates the first OpenCode config or leaves an
-  existing one untouched; no safe automatic JSONC merge yet.
-- This repo cannot build on your MacBook from GitHub; run the lab bootstrap locally.
-- Existing-project adoption, compatibility and migration are out of scope for v0.
-- Every independent harness evaluation should start from the clean lab `main` commit; the `app` branch is a development sandbox, not an installation-compatibility fixture.
+- This is experimental, not production-ready. The third lab trial exposed a
+  false Android failure: an active task was successfully added but remained
+  hidden under the Completed filter. Overly broad E2E and reviewer requirements
+  inflated task duration. The lean policy removes those default obligations.
+- OpenCode agent instructions cannot fully guarantee deterministic behavior.
+  The machine-checked layer is the Flutter command runner and lightweight CI.
+  Production readiness still needs a sustained sequence of successful,
+  low-cost feature deliveries and focused high-risk validation.
+- Installer preserves existing project configuration and does not automatically
+  merge it; synchronize skill/AGENTS changes into each existing project.
+- Existing-project adoption and migrations remain out of scope for v0.
+- Lab main remains the untouched SDK starter; app is the mutable feature branch.
 
 ## Lightweight CI and local device checks
 
 Hosted CI only validates shell syntax, config, installation and fast Python tests.
-Android/iOS Maestro and Web Playwright E2E are the installed agent's local
-responsibility for affected features; they are not unconditional CI jobs.
+Android/iOS Maestro and Web Playwright E2E are optional risk-based checks,
+not routine CI jobs or prerequisites for every feature.
 
 New installations include `.flutter-harness/bin/maestro.sh`. The Maestro
 MCP runs through this project-local launcher (workspace cwd), which locates
@@ -269,8 +252,8 @@ bash .flutter-harness/bin/check.sh . standard mobile-web
 bash .flutter-harness/bin/check.sh . full mobile-web
 ~~~
 
-The lab CI fixture omits Web compilation from routine PR checks; the full
-Web/Android/iOS builds remain available **locally** through
+The lab CI fixture omits Web compilation from routine PR checks; optional
+full Web/Android/iOS builds remain available **locally** through
 `bash .flutter-harness/bin/check.sh . full mobile-web`.
 
 After an approved `git push` and `gh pr create`, the agent checks delivery
