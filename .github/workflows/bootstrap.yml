@@ -24,6 +24,8 @@ jobs:
         run: |
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
+      - name: Verify OpenCode delivery-guard logic (no model calls)
+        run: node --test scripts/test_delivery_guard.mjs
       - name: Verify token usage reporter (no model calls)
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify Maestro shim without real devices
@@ -40,6 +42,28 @@ jobs:
           test "$out" = "MAESTRO:mcp"
           out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh test flow.yaml)"
           test "$out" = "MAESTRO:test flow.yaml"
+      - name: Verify PR guard rejects an unpushed HEAD
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          git -C "$tmp" init -q
+          git -C "$tmp" config user.name Harness
+          git -C "$tmp" config user.email harness@example.invalid
+          git -C "$tmp" commit -q --allow-empty -m bootstrap
+          git -C "$tmp" switch -q -c feature/test
+          head="$(git -C "$tmp" rev-parse HEAD)"
+          mkdir -p "$tmp/fakebin"
+          cat > "$tmp/fakebin/gh" <<'EOF'
+          #!/bin/sh
+          printf 'https://github.com/test/lab/pull/1\tapp\tOPEN\tfeature/test\t%s\n' "$FAKE_HEAD"
+          EOF
+          chmod +x "$tmp/fakebin/gh"
+          FAKE_HEAD="$head" PATH="$tmp/fakebin:$PATH" bash scripts/verify-pr.sh "$tmp" app
+          if FAKE_HEAD="0000000000000000000000000000000000000000" PATH="$tmp/fakebin:$PATH" bash scripts/verify-pr.sh "$tmp" app; then
+            echo "PR verifier accepted a stale remote commit" >&2
+            exit 1
+          fi
       - name: Smoke-test installer and idempotency
         run: |
           set -euo pipefail
@@ -52,6 +76,8 @@ jobs:
             test -f "$tmp/.flutter-harness/bin/maestro.sh"
             test -f "$tmp/.flutter-harness/bin/check.sh"
             test -f "$tmp/.flutter-harness/bin/verify-pr.sh"
+            test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
+            test -f "$tmp/.opencode/plugins/delivery-guard/guard.mjs"
             test -f "$tmp/.flutter-harness/bin/verify-e2e.py"
             if [[ "$profile" == "mobile-web" ]]; then
               test -f "$tmp/.flutter-harness/bin/web-preview.py"

@@ -56,6 +56,16 @@ for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json'; do
   fi
 done
 
+# V2 delivery guard resumes a normal agent session if implementation stops
+# without an open, up-to-date PR. Existing plugin files are never overwritten.
+mkdir -p "$TARGET/.opencode/plugins/delivery-guard"
+for name in index.js guard.mjs; do
+  if [[ ! -e "$TARGET/.opencode/plugins/delivery-guard/$name" ]]; then
+    cp "$ROOT/plugins/delivery-guard/$name" "$TARGET/.opencode/plugins/delivery-guard/$name"
+    info "Installed delivery guard $name."
+  fi
+done
+
 if [[ ! -e "$TARGET/.flutter-harness/config.json" ]]; then
   printf '{\n  "profile": "%s",\n  "source": "https://github.com/halsab/flutter-harness"\n}\n' "$PROFILE" > "$TARGET/.flutter-harness/config.json"
   info "Created .flutter-harness/config.json ($PROFILE)"
