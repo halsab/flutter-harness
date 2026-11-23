@@ -172,6 +172,31 @@ model variant; confirm Luna Medium on the new session's model selector and
 audit the session export afterward. GitHub Actions runs the same validation and installer smoke
 tests; the lab additionally validates its own OpenCode config.
 
+## OpenCode V2 completion guard
+
+The **delivery guard** plugin is automatically installed under
+`.opencode/plugins/delivery-guard`. On a feature request it records the
+initial Git state. When OpenCode would normally finish, the experimental V2
+`session.hook("experimental.idle")` runs a **read-only** Git/PR check.
+If the task stopped at tests or a local edit without a verified PR, the
+plugin inserts a continuation into the same session (at most twice).
+After two unsuccessful continuations it fails the execution rather than
+silently claiming delivery.
+
+The guard **never** pushes, commits, changes files or bypasses push approval.
+`verify-pr.sh` now additionally checks that the PR's remote head SHA equals
+local HEAD. It does not prove the feature is correct or that a human actually
+performed a semantic review; the standard Flutter CI and owner PR review
+remain necessary. The plugin uses an **experimental OpenCode V2 hook** and
+must be tested on the Mac with the installed OpenCode version before its
+runtime reliability can be claimed. This is a deliberately small delivery
+backstop, not a general-purpose background orchestration daemon.
+
+```sh
+node --test scripts/test_delivery_guard.mjs
+bash .flutter-harness/bin/verify-pr.sh . app
+```
+
 ## Default short-prompt workflow
 
 1. Ask for a feature using plain language. The agent resolves minor technical
