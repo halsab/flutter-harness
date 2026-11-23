@@ -32,6 +32,13 @@ else
   info "Preserved existing verification runner."
 fi
 
+if [[ ! -e "$TARGET/.flutter-harness/bin/verify-pr.sh" ]]; then
+  cp "$ROOT/scripts/verify-pr.sh" "$TARGET/.flutter-harness/bin/verify-pr.sh"
+  info "Installed PR delivery verification."
+else
+  info "Preserved existing PR verification."
+fi
+
 if [[ ! -e "$TARGET/.flutter-harness/config.json" ]]; then
   printf '{\n  "profile": "%s",\n  "source": "https://github.com/halsab/flutter-harness"\n}\n' "$PROFILE" > "$TARGET/.flutter-harness/config.json"
   info "Created .flutter-harness/config.json ($PROFILE)"

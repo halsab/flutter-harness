@@ -226,3 +226,8 @@ bash .flutter-harness/bin/check.sh . full mobile-web
 
 The lab CI fixture omits Web compilation from routine PR checks; it remains
 available through an explicitly dispatched full validation workflow.
+
+After an approved `git push` and `gh pr create`, the agent checks delivery
+with `bash .flutter-harness/bin/verify-pr.sh . app` (or the documented
+integration branch). It is read-only and returns BLOCKED if the PR is
+missing, closed or targets the wrong base; it never bypasses push approval.
