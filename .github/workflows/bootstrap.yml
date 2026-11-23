@@ -33,7 +33,7 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           mkdir -p "$tmp/jdk/bin" "$tmp/tools"
           printf '#!/bin/sh\nexit 0\n' > "$tmp/jdk/bin/java"
-          printf '#!/bin/sh\nprintf "MAESTRO:%s\\n" "$*"\n' > "$tmp/tools/maestro"
+          printf '#!/bin/sh\nprintf "MAESTRO:%%s\\n" "$*"\n' > "$tmp/tools/maestro"
           chmod +x "$tmp/jdk/bin/java" "$tmp/tools/maestro"
           JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh --check
           out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh mcp)"
