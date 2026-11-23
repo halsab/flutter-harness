@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, app]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -27,6 +28,6 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
-      - name: Build Web on PR
-        if: github.event_name == 'pull_request'
+      - name: Build Web (explicit full validation)
+        if: github.event_name == 'workflow_dispatch'
         run: flutter build web

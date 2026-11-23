@@ -17,7 +17,27 @@ TARGET="$(cd "$TARGET" && pwd -P)"
 grep -Eq '^[[:space:]]*flutter:[[:space:]]*$' "$TARGET/pubspec.yaml" || fail "No Flutter dependency found in pubspec.yaml"
 [[ "$ROOT" != "$TARGET" ]] || fail "Harness source is not a target Flutter project"
 
-mkdir -p "$TARGET/.flutter-harness" "$TARGET/.opencode/skills/flutter-harness"
+mkdir -p "$TARGET/.flutter-harness/bin" "$TARGET/.opencode/skills/flutter-harness"
+if [[ ! -e "$TARGET/.flutter-harness/bin/maestro.sh" ]]; then
+  cp "$ROOT/scripts/maestro.sh" "$TARGET/.flutter-harness/bin/maestro.sh"
+  info "Installed portable Maestro launcher."
+else
+  info "Preserved existing Maestro launcher."
+fi
+
+if [[ ! -e "$TARGET/.flutter-harness/bin/check.sh" ]]; then
+  cp "$ROOT/scripts/check.sh" "$TARGET/.flutter-harness/bin/check.sh"
+  info "Installed reusable local verification runner."
+else
+  info "Preserved existing verification runner."
+fi
+
+if [[ ! -e "$TARGET/.flutter-harness/bin/verify-pr.sh" ]]; then
+  cp "$ROOT/scripts/verify-pr.sh" "$TARGET/.flutter-harness/bin/verify-pr.sh"
+  info "Installed PR delivery verification."
+else
+  info "Preserved existing PR verification."
+fi
 
 if [[ ! -e "$TARGET/.flutter-harness/config.json" ]]; then
   printf '{\n  "profile": "%s",\n  "source": "https://github.com/halsab/flutter-harness"\n}\n' "$PROFILE" > "$TARGET/.flutter-harness/config.json"
@@ -35,7 +55,7 @@ fi
 
 if [[ ! -e "$TARGET/opencode.json" && ! -e "$TARGET/opencode.jsonc" ]]; then
   cp "$ROOT/templates/opencode-${PROFILE}.jsonc" "$TARGET/opencode.jsonc"
-  info "Created OpenCode V2 config with Superpowers and MCP servers."
+  info "Created lean autonomous OpenCode V2 config with MCP servers."
 else
   info "Preserved existing OpenCode config. Merge with templates/opencode-${PROFILE}.jsonc manually."
 fi
@@ -48,11 +68,23 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
-Use Superpowers for planning, execution and review. Work in feature branches,
-commit verified milestones, open pull requests; never merge automatically.
-Respect OpenCode model routing and permission prompts; do not bypass denied actions.
-Only the human can approve updates to golden image baselines.
-Report PASS / FAIL / BLOCKED / SKIPPED accurately.
+
+User requests describe outcomes; handle technical orchestration autonomously.
+Ask only material product/architecture/security questions, and seek at most one
+design signoff. No second plan approval or execution-mode question.
+For sequential tasks, create a feature branch in this checkout from app (lab)
+or the project's documented integration branch; no routine worktree prompt.
+Preserve unrelated local changes (especially opencode.jsonc); stage task files only.
+Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
+Use Luna-low explore for broad unfamiliar-code mapping only, not routine searches.
+Test Android/iOS with Maestro mobile, Web with Playwright; report real outcomes.
+Review the task diff against the integration base plus task-related new files.
+Require evidence-backed failure scenarios; one full review, one targeted recheck
+for material high-risk fixes. Mark unresolved findings OPEN, never PASSED.
+Then push and create a PR to the integration
+branch, requesting any required tool approval. Never auto-merge or force-push.
+Only the owner accepts changed golden baselines. Honor denied tool operations.
+Report PASS / FAIL / BLOCKED / SKIPPED accurately and keep updates concise.
 <!-- flutter-harness:end -->
 INSTRUCTIONS
   info "Added project instructions."
