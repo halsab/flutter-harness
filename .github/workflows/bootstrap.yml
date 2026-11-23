@@ -56,20 +56,8 @@ jobs:
             if [[ "$profile" == "mobile-web" ]]; then
               test -f "$tmp/.flutter-harness/bin/web-preview.py"
             fi
-            test "$(grep -c '^/.playwright-mcp/
-            test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
-            grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
-            python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
-            rm -rf "$tmp"
-          done
- "$tmp/.gitignore")" -eq 1
-            test "$(grep -c '^/.flutter-harness/verification.json
-            test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
-            grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
-            python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
-            rm -rf "$tmp"
-          done
- "$tmp/.gitignore")" -eq 1
+            test "$(grep -c '^/.playwright-mcp/$' "$tmp/.gitignore")" -eq 1
+            test "$(grep -c '^/.flutter-harness/verification.json$' "$tmp/.gitignore")" -eq 1
             test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
             grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
             python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
