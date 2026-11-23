@@ -6,7 +6,7 @@
 
 ## Initial scope
 - **Only new, clean Flutter SDK projects.** No adoption or migration of existing applications in v0.
-- The lab `main` branch remains the clean SDK starter. The `app` branch now adds harness configuration and official Flutter/Dart skills, but still has no agent-authored application feature. Do not prebuild a Task Manager or ship application-specific fixtures from the harness.
+- The lab `main` branch remains the untouched Flutter SDK starter. Lab PR #5 adds the first agent-authored task manager to `app` when merged; do not ship application-specific fixtures in the reusable harness.
 - For reproducible evaluations, reset the working copy or branch from the exact clean `main` SHA, not a previously modified `app` branch.
 - The `app` branch is for observing agent-written functionality, not testing existing-project installation.
 
@@ -31,7 +31,9 @@
 - No self-hosted runner on the owner's MacBook in v0.
 - Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
 - Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
-- Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.\n- Prefer Luna medium for implementation and review. Sol medium is available for complex architecture or hard diagnosis, not automatic on every feature.\n- Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
+- Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.
+- Prefer Luna medium for implementation and review. Sol medium is available for complex architecture or hard diagnosis, not automatic on every feature.
+- Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
 
 ## Development status
 
@@ -41,7 +43,5 @@ default Flutter project on Android emulator, iOS Simulator and Chrome, basic
 Dart/Maestro/Playwright/Chrome DevTools/Xcode MCP calls, and Sol/Luna model
 responses. These are *manual* checks, not repeatable device E2E tests.
 
-Remaining milestones: complete agent-authored feature implementation and PR,
-reusable Maestro/Playwright flows with evidence, golden approval process, and
-the optional Dart orchestration CLI. The CI hosted on Linux does not run iOS
+The first full task-list trial reached PR #5, with passing CI and an iOS Maestro flow. It exposed redundant approvals, repeated reviews and loops, high model/context usage and missing automatic PR handoff. The lean workflow addresses these on paper but requires a new runtime trial before claiming improvement. Additional milestones: Android E2E, reusable Playwright flows, golden baselines and an optional Dart orchestration CLI. The CI hosted on Linux does not run iOS
 simulators or prove locally authorized MCP model routing.
