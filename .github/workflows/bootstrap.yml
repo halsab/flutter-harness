@@ -24,6 +24,8 @@ jobs:
         run: |
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
+      - name: Verify token usage reporter (no model calls)
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Smoke-test installer and idempotency
         run: |
           set -euo pipefail
