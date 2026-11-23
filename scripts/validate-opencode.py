@@ -9,10 +9,10 @@ from pathlib import Path
 SOL = "openai/gpt-6.2-sol"
 LUNA = "openai/gpt-6-luna"
 ROLES = {
-    "build": f"{LUNA}#high",
+    "build": f"{LUNA}#medium",
     "plan": f"{SOL}#medium",
     "architect": f"{SOL}#medium",
-    "reviewer": f"{SOL}#medium",
+    "reviewer": f"{LUNA}#medium",
     "general": f"{LUNA}#medium",
     "explore": f"{LUNA}#low",
     "compaction": f"{LUNA}#low",
@@ -29,6 +29,15 @@ REQUIRED_SAFETY = {
     ("shell", "gh release create *", "deny"),
     ("shell", "flutter pub publish *", "deny"),
 }
+DISABLED_INTERACTIVE_SKILLS = {
+    "brainstorming",
+    "writing-plans",
+    "executing-plans",
+    "subagent-driven-development",
+    "using-git-worktrees",
+    "finishing-a-development-branch",
+}
+
 REVIEW_READONLY = {
     ("edit", "*", "deny"),
     ("shell", "*", "deny"),
@@ -69,9 +78,14 @@ def validate(filename, profile):
         ensure(REVIEW_READONLY <= ruleset(subagent.get("permissions")), f"{name} isn't read-only")
 
     ensure(REQUIRED_SAFETY <= ruleset(data.get("permissions")), "missing safety permissions")
+    disabled_skills = {("skill", name, "deny") for name in DISABLED_INTERACTIVE_SKILLS}
+    ensure(
+        disabled_skills <= ruleset(data.get("permissions")),
+        "interactive Superpowers workflow skills must be hidden in the autonomous profile",
+    )
 
     provider = data.get("providers", {}).get("openai", {}).get("models", {})
-    for name, effort in (("gpt-6.2-sol", "medium"), ("gpt-6-luna", "high")):
+    for name, effort in (("gpt-6.2-sol", "medium"), ("gpt-6-luna", "medium")):
         ensure(
             provider.get(name, {}).get("settings", {}).get("reasoningEffort") == effort,
             f"wrong model default effort: {name}",
@@ -82,14 +96,19 @@ def validate(filename, profile):
     if profile == "mobile-web":
         expected |= {"playwright", "chrome-devtools"}
     ensure(set(servers) == expected, f"{profile} MCP servers must be {sorted(expected)}")
+    if profile == "mobile-web":
+        ensure(
+            servers["chrome-devtools"].get("disabled") is True,
+            "Chrome DevTools MCP must be disabled unless diagnosing a Web failure",
+        )
     ensure(servers["dart"].get("command") == ["dart", "mcp-server"], "Dart MCP command changed")
     ensure(servers["maestro"].get("command") == ["maestro", "mcp"], "Maestro MCP command changed")
     if profile == "mobile-web":
         ensure(servers["playwright"].get("command") == ["npx", "--yes", "@playwright/mcp@0.0.86"], "Playwright pin changed")
         ensure(servers["chrome-devtools"].get("command") == ["npx", "--yes", "chrome-devtools-mcp@1.13.0"], "Chrome DevTools pin changed")
     ensure(
-        data.get("plugins") == ["superpowers@git+https://github.com/obra/superpowers.git#v7.0.2"],
-        "Superpowers version changed",
+        data.get("plugins") == [],
+        "default autonomous profile must not load mandatory interactive Superpowers",
     )
     print(f"PASS OpenCode {profile}: {filename}")
 
