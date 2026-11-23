@@ -17,7 +17,13 @@ TARGET="$(cd "$TARGET" && pwd -P)"
 grep -Eq '^[[:space:]]*flutter:[[:space:]]*$' "$TARGET/pubspec.yaml" || fail "No Flutter dependency found in pubspec.yaml"
 [[ "$ROOT" != "$TARGET" ]] || fail "Harness source is not a target Flutter project"
 
-mkdir -p "$TARGET/.flutter-harness" "$TARGET/.opencode/skills/flutter-harness"
+mkdir -p "$TARGET/.flutter-harness/bin" "$TARGET/.opencode/skills/flutter-harness"
+if [[ ! -e "$TARGET/.flutter-harness/bin/maestro.sh" ]]; then
+  cp "$ROOT/scripts/maestro.sh" "$TARGET/.flutter-harness/bin/maestro.sh"
+  info "Installed portable Maestro launcher."
+else
+  info "Preserved existing Maestro launcher."
+fi
 
 if [[ ! -e "$TARGET/.flutter-harness/config.json" ]]; then
   printf '{\n  "profile": "%s",\n  "source": "https://github.com/halsab/flutter-harness"\n}\n' "$PROFILE" > "$TARGET/.flutter-harness/config.json"

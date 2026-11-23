@@ -131,10 +131,8 @@
       },
       "maestro": {
         "type": "local",
-        "command": [
-          "maestro",
-          "mcp"
-        ]
+        "command": ["bash", ".flutter-harness/bin/maestro.sh", "mcp"],
+        "cwd": "."
       }
     }
   },

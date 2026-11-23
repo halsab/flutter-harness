@@ -193,3 +193,24 @@ separate paid model invocation by default. Do not commit exports.
 - This repo cannot build on your MacBook from GitHub; run the lab bootstrap locally.
 - Existing-project adoption, compatibility and migration are out of scope for v0.
 - Every independent harness evaluation should start from the clean lab `main` commit; the `app` branch is a development sandbox, not an installation-compatibility fixture.
+
+## Lightweight CI and local device checks
+
+Hosted CI only validates shell syntax, config, installation and fast Python tests.
+Android/iOS Maestro and Web Playwright E2E are the installed agent's local
+responsibility for affected features; they are not unconditional CI jobs.
+
+New installations include `.flutter-harness/bin/maestro.sh`. The Maestro
+MCP runs through this project-local launcher (workspace cwd), which locates
+Maestro from MAESTRO_BIN, PATH or ~/.maestro/bin, and Java from JAVA_HOME,
+ANDROID_STUDIO_JBR, the macOS Android Studio JBR or PATH.
+
+To diagnose the environment, run:
+
+~~~sh
+bash .flutter-harness/bin/maestro.sh --check
+bash .flutter-harness/bin/maestro.sh test maestro/flows/your-flow.yaml
+~~~
+
+Existing OpenCode configurations remain untouched by the installer; merge
+the new local MCP command deliberately, then restart OpenCode.

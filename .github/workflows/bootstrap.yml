@@ -26,6 +26,20 @@ jobs:
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
       - name: Verify token usage reporter (no model calls)
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Verify Maestro shim without real devices
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/jdk/bin" "$tmp/tools"
+          printf '#!/bin/sh\nexit 0\n' > "$tmp/jdk/bin/java"
+          printf '#!/bin/sh\nprintf "MAESTRO:%s\\n" "$*"\n' > "$tmp/tools/maestro"
+          chmod +x "$tmp/jdk/bin/java" "$tmp/tools/maestro"
+          JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh --check
+          out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh mcp)"
+          test "$out" = "MAESTRO:mcp"
+          out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh test flow.yaml)"
+          test "$out" = "MAESTRO:test flow.yaml"
       - name: Smoke-test installer and idempotency
         run: |
           set -euo pipefail
@@ -35,6 +49,7 @@ jobs:
             bash scripts/install.sh "$tmp" "$profile"
             bash scripts/install.sh "$tmp" "$profile"
             test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
+            test -f "$tmp/.flutter-harness/bin/maestro.sh"
             test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
             grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
             python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"

@@ -102,7 +102,8 @@ def validate(filename, profile):
             "Chrome DevTools MCP must be disabled unless diagnosing a Web failure",
         )
     ensure(servers["dart"].get("command") == ["dart", "mcp-server"], "Dart MCP command changed")
-    ensure(servers["maestro"].get("command") == ["maestro", "mcp"], "Maestro MCP command changed")
+    ensure(servers["maestro"].get("command") == ["bash", ".flutter-harness/bin/maestro.sh", "mcp"], "Maestro MCP launcher changed")
+    ensure(servers["maestro"].get("cwd") == ".", "Maestro MCP must use workspace cwd")
     if profile == "mobile-web":
         ensure(servers["playwright"].get("command") == ["npx", "--yes", "@playwright/mcp@0.0.86"], "Playwright pin changed")
         ensure(servers["chrome-devtools"].get("command") == ["npx", "--yes", "chrome-devtools-mcp@1.13.0"], "Chrome DevTools pin changed")
