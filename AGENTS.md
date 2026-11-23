@@ -4,7 +4,7 @@ This repository contains the reusable harness, not the user's Flutter applicatio
 
 - Default product workflow: one concise design checkpoint only when material decisions require it, then plan/implement/test/review/PR without asking the user to approve a second technical plan.
 - Preserve the upstream Superpowers project unchanged. Its mandatory interactive approvals are incompatible with the autonomous default; it is available only as a separately opted-in interactive workflow.
-- The default model is GPT-6 Luna medium. GPT-6.2 Sol medium is for complex architecture or hard diagnosis, not routine calls. Prefer one Luna medium final reviewer pass; avoid repeated full reviews.
+- The default model is GPT-6 Luna medium. GPT-6.2 Sol medium is for complex architecture or hard diagnosis, not routine calls. Prefer one Luna medium final reviewer pass with concrete scenarios and evidence; allow at most one targeted recheck. Use Luna-low explore only for broad unfamiliar-code search.
 - Work on a feature branch in the current checkout by default. Preserve unrelated local edits; never reset, stash, commit or stage them without authorization.
 - Prefer official Flutter/Dart tools, targeted tests and deterministic scripts. Use Maestro for Android/iOS mobile scenarios and Playwright for Web. Do not loop on incompatible Maestro Web semantics.
 - Never claim a test, iOS Simulator run, build, UI observation or model-cost reduction without evidence. Report PASS / FAIL / BLOCKED / SKIPPED separately.

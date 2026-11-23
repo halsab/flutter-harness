@@ -22,7 +22,16 @@ requirements and changed code, without the author's self-assessment. Request
 concrete failing scenarios and evidence, not a numerical score or generic
 style complaints. `build` fixes confirmed important issues and can request
 **one targeted recheck** of a high-risk correction. Do not start a five-round
-review loop by default.
+review loop by default. Scope the review to the full task diff against the
+integration branch's merge base, plus task-related uncommitted and untracked
+files; `git diff HEAD` alone misses earlier task commits. Require a location,
+realistic failure scenario, impact and evidence for every accepted finding.
+Mark review OPEN if material findings or relevant failed checks remain; do not
+mislabel a blocked platform test as a pass.
+
+For large unfamiliar codebases, use one read-only `explore` (Luna low) request
+for a concise map of file paths, key symbols, callers and relevant tests. The
+implementer verifies cited code. Skip this delegation for small/focused tasks.
 
 This adapts the useful independent-review principle from
 [Loop Code Review](https://github.com/di-sukharev/loop-code-review-skill)

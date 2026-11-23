@@ -76,8 +76,12 @@ For sequential tasks, create a feature branch in this checkout from app (lab)
 or the project's documented integration branch; no routine worktree prompt.
 Preserve unrelated local changes (especially opencode.jsonc); stage task files only.
 Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
+Use Luna-low explore for broad unfamiliar-code mapping only, not routine searches.
 Test Android/iOS with Maestro mobile, Web with Playwright; report real outcomes.
-Obtain one focused final review, then push and create a PR to the integration
+Review the task diff against the integration base plus task-related new files.
+Require evidence-backed failure scenarios; one full review, one targeted recheck
+for material high-risk fixes. Mark unresolved findings OPEN, never PASSED.
+Then push and create a PR to the integration
 branch, requesting any required tool approval. Never auto-merge or force-push.
 Only the owner accepts changed golden baselines. Honor denied tool operations.
 Report PASS / FAIL / BLOCKED / SKIPPED accurately and keep updates concise.
