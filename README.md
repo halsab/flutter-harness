@@ -6,12 +6,15 @@ autonomous workflow, official Flutter/Dart AI tooling, Maestro for mobile UI,
 and Playwright for Web. Upstream [Superpowers](https://github.com/obra/superpowers)
 remains optional for interactive design sessions.
 
-**Status: experimental (November 2026); first end-to-end lab feature PR produced.**
+**Status: experimental (November 2026); second autonomous lab trial complete.**
 The SDK starter has run on an Android emulator, iOS Simulator and Chrome on
-the owner's MacBook. Flutter quick/standard/full checks and basic MCP
-connectivity were exercised locally. This is **not yet a production-ready autonomous development system**;
-the initial lab task-list PR (#5) was completed, but the revised lean workflow
-still requires a local end-to-end validation after merging.
+the owner's MacBook. Flutter quick/standard/full checks and MCP
+connectivity were exercised locally. The autonomous trial for editing task
+titles reached PR #6 with green CI and Android Maestro / Web Playwright runs.
+Its audit found incomplete reviewer shell permissions, no observed iOS Maestro
+run and a session-level Luna High override; this revision tightens those
+contracts. This is **not yet a production-ready autonomous development system**;
+a fresh runtime trial is still required to validate these corrections.
 
 Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 
@@ -131,7 +134,9 @@ every PR before merging.
 Run `python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile`
 and `python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web`
 to check configured models, roles, permissions and MCP lists without using
-model tokens. GitHub Actions runs the same validation and installer smoke
+model tokens. These inspect **configuration**, not the active UI-selected
+model variant; confirm Luna Medium on the new session's model selector and
+audit the session export afterward. GitHub Actions runs the same validation and installer smoke
 tests; the lab additionally validates its own OpenCode config.
 
 ## Default short-prompt workflow
@@ -142,11 +147,16 @@ tests; the lab additionally validates its own OpenCode config.
 2. The agent creates a feature branch in the current checkout and plans
    internally. **No second approval of a technical plan, no worktree choice,
    and no execution-mode choice.**
-3. The agent implements with targeted tests, verifies Flutter analysis/tests
-   and relevant Android/iOS Maestro and Web Playwright scenarios, using bounded
-   retries and honest PASS / FAIL / BLOCKED / SKIPPED reports.
-4. The agent performs **one** focused Luna reviewer pass, fixes confirmed
-   important issues and self-checks affected behavior. Escalate to Sol only
+3. The agent implements with targeted tests, verifies Flutter analysis/tests,
+   discovers both Android and iOS devices, runs affected Maestro UI scenarios
+   on available Android **and** iOS targets, and verifies Web with Playwright.
+   It checks exact intended post-action state rather than accepting accidental
+   duplicate text. Builds are not UI tests. It records a separate
+   PASS / FAIL / BLOCKED / SKIPPED result per platform, with evidence.
+4. The agent performs **one** focused Luna reviewer pass on the complete
+   diff; the reviewer uses separate whitelisted read-only Git commands,
+   and reports OPEN if diff coverage is incomplete. Fix confirmed
+   important issues and self-check affected behavior. Escalate to Sol only
    for significant technical complexity.
 5. The agent commits, requests push approval as required, and **creates the
    PR automatically**. If push is denied, report BLOCKED rather than claiming
@@ -183,11 +193,11 @@ separate paid model invocation by default. Do not commit exports.
 ## Known gaps
 
 - No Dart orchestration CLI yet; bootstrap scripts use Bash.
-- The first agent-authored lab feature PR (#5) reached GitHub with passing CI,
-  and a repeatable iOS Maestro flow; the trial exposed repeated approval,
-  review and debugging loops. The lean default workflow fixes those policies
-  but still needs a new local runtime trial. Android E2E and reusable Web
-  Playwright regression flow are not yet fully demonstrated by that trial.
+- The first lab feature PR (#5) exposed repeated agent approval and review
+  loops. The subsequent autonomous title-edit PR (#6) reached GitHub with
+  passing CI and actual Android Maestro/Web Playwright calls, but skipped iOS
+  Maestro and had three read-only reviewer command denials. These targeted
+  fixes require another local end-to-end trial; no claim of proof until then.
 - Project installation only creates the first OpenCode config or leaves an
   existing one untouched; no safe automatic JSONC merge yet.
 - This repo cannot build on your MacBook from GitHub; run the lab bootstrap locally.
@@ -224,8 +234,9 @@ bash .flutter-harness/bin/check.sh . standard mobile-web
 bash .flutter-harness/bin/check.sh . full mobile-web
 ~~~
 
-The lab CI fixture omits Web compilation from routine PR checks; it remains
-available through an explicitly dispatched full validation workflow.
+The lab CI fixture omits Web compilation from routine PR checks; the full
+Web/Android/iOS builds remain available **locally** through
+`bash .flutter-harness/bin/check.sh . full mobile-web`.
 
 After an approved `git push` and `gh pr create`, the agent checks delivery
 with `bash .flutter-harness/bin/verify-pr.sh . app` (or the documented
