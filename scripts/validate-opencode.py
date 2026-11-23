@@ -43,6 +43,7 @@ REVIEW_READONLY = {
     ("shell", "*", "deny"),
     ("shell", "git status *", "allow"),
     ("shell", "git diff *", "allow"),
+    ("shell", "git merge-base *", "allow"),
     ("shell", "git show *", "allow"),
     ("shell", "git log *", "allow"),
 }
@@ -75,7 +76,11 @@ def validate(filename, profile):
     for name in ("architect", "reviewer"):
         subagent = agents[name]
         ensure(subagent.get("mode") == "subagent", f"{name} must be a subagent")
-        ensure(REVIEW_READONLY <= ruleset(subagent.get("permissions")), f"{name} isn't read-only")
+        subagent_rules = ruleset(subagent.get("permissions"))
+        ensure(REVIEW_READONLY <= subagent_rules, f"{name} isn't read-only")
+        allowed_shell = {rule for rule in subagent_rules if rule[0] == "shell" and rule[2] == "allow"}
+        ensure(allowed_shell <= REVIEW_READONLY, f"{name} permits unexpected shell commands")
+    ensure("OPEN" in agents["reviewer"].get("description", ""), "reviewer must report incomplete coverage as OPEN")
 
     ensure(REQUIRED_SAFETY <= ruleset(data.get("permissions")), "missing safety permissions")
     disabled_skills = {("skill", name, "deny") for name in DISABLED_INTERACTIVE_SKILLS}

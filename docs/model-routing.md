@@ -27,7 +27,13 @@ integration branch's merge base, plus task-related uncommitted and untracked
 files; `git diff HEAD` alone misses earlier task commits. Require a location,
 realistic failure scenario, impact and evidence for every accepted finding.
 Mark review OPEN if material findings or relevant failed checks remain; do not
-mislabel a blocked platform test as a pass.
+mislabel a blocked platform test as a pass. Reviewer shell is deliberately
+read-only: run `git status --short`, `git merge-base app HEAD`, and
+`git diff --no-ext-diff <literal-base-sha>` as **separate** calls; use
+`read` to inspect files rather than `cat`. Chaining with `&&`, `;`
+or `$(...)` matches neither the safe whitelist nor the review contract.
+If any relevant diff/new file is inaccessible, report review **OPEN**, not
+PASSED. Do not grant `shell *` to workaround denied commands.
 
 For large unfamiliar codebases, use one read-only `explore` (Luna low) request
 for a concise map of file paths, key symbols, callers and relevant tests. The
@@ -63,9 +69,18 @@ previously running session has unloaded the old plugin.
 
 ## Tools and context budget
 
-- Maestro validates mobile Android/iOS interfaces and relaunch persistence.
-  Use **Playwright** for Flutter Web. Do not spend dozens of attempts trying
-  Maestro Web text selectors or unsupported keyboard commands.
+- Discover Android and iOS devices first (`flutter devices`, Maestro device listing;
+  on macOS check `xcrun simctl list devices booted`). A booted iOS Simulator
+  must receive a Maestro UI scenario for any relevant mobile feature even if
+  the Android flow already passed. If unavailable, document iOS BLOCKED and
+  the concrete reason; an iOS build is separate evidence. Use **Playwright**
+  for Flutter Web. Do not spend dozens of attempts trying Maestro Web text
+  selectors or unsupported keyboard commands.
+- Assert the **exact expected persisted result** after relaunch. If a typing
+  operation accidentally duplicates a suffix, fix the input action and rerun;
+  never replace an expected value with the observed wrong value to make a test pass.
+- Report separate Android/iOS/Web statuses, target IDs, key assertions and
+  evidence. Distinguish a successful build, UI test and unavailable platform.
 - Chrome DevTools MCP remains configured but `disabled: true` by default.
   Enable it temporarily only when Playwright cannot diagnose a browser bug.
 - For a repeated failing tool command, stop after two attempts at the same
@@ -90,7 +105,11 @@ report lists raw input/output/reasoning/cache counters, calls to tools, and
 agent/model variants. It is not a monetary bill or an exact context-window
 cost. Keep exports out of git. Individual invocations and reasoning efforts
 must be checked in actual session exports; static config tests only verify
-declared defaults.
+declared defaults. A GUI-selected OpenCode variant can persist per session;
+the second lab trial's `build` export used Luna **high** despite a project
+default of **medium**. Confirm the displayed variant in a **new** interactive
+session before testing. Do not attribute High usage to the Harness default
+without checking the active session.
 
 ## GitHub and authorization
 

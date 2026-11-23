@@ -76,9 +76,16 @@ For sequential tasks, create a feature branch in this checkout from app (lab)
 or the project's documented integration branch; no routine worktree prompt.
 Preserve unrelated local changes (especially opencode.jsonc); stage task files only.
 Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
+Check actual session model variant in the UI; it can override config defaults.
 Use Luna-low explore for broad unfamiliar-code mapping only, not routine searches.
-Test Android/iOS with Maestro mobile, Web with Playwright; report real outcomes.
-Review the task diff against the integration base plus task-related new files.
+Discover Android and iOS devices; test on a booted iOS Simulator as well as
+Android via Maestro, and Web via Playwright. Builds are not UI tests.
+Check exact intended post-action text; never change an expected value to hide
+an input bug. Report Android/iOS/Web with PASS/FAIL/BLOCKED/SKIPPED evidence.
+Review the complete task diff against the integration base, including new files.
+For read-only reviewer shell, run Git status, merge-base and diff separately;
+no chained commands or subshells. Read files with the read tool, not cat.
+If the complete diff could not be inspected, review is OPEN, never PASSED.
 Require evidence-backed failure scenarios; one full review, one targeted recheck
 for material high-risk fixes. Mark unresolved findings OPEN, never PASSED.
 Then push and create a PR to the integration
