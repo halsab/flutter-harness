@@ -1,7 +1,6 @@
 # Verification policy: speed with quality
 
-Ordinary feature: one deterministic check.sh standard run (format, analyzer,
-flutter test) and one concise diff self-review. CI repeats fast code checks.
+Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior.
 
 Add tests only for important public behavior:
 - Dart unit tests for validation, calculations, business decisions, persistence,
@@ -28,6 +27,5 @@ device-input failures; then report the optional test blocked rather than
 looping. An optional unrun E2E does not block a routine PR; a failed REQUIRED
 risk-based gate does.
 
-An independent reviewer is optional for routine work; prefer a single focused
-review only for genuine risks. Test/review overhead should not overwhelm
+An independent reviewer is optional for isolated routine work, but use one focused pre-PR review for material cross-feature interactions (e.g. sorting+search+filter) and genuine high risks. It must check acceptance criteria and missing regression assertions, not aesthetics. Test/review overhead should not overwhelm
 implementation.
