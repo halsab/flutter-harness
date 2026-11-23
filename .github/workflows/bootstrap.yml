@@ -50,6 +50,7 @@ jobs:
             bash scripts/install.sh "$tmp" "$profile"
             test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
             test -f "$tmp/.flutter-harness/bin/maestro.sh"
+            test -f "$tmp/.flutter-harness/bin/check.sh"
             test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
             grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
             python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"

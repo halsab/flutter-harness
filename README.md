@@ -214,3 +214,15 @@ bash .flutter-harness/bin/maestro.sh test maestro/flows/your-flow.yaml
 
 Existing OpenCode configurations remain untouched by the installer; merge
 the new local MCP command deliberately, then restart OpenCode.
+
+The installer also copies `.flutter-harness/bin/check.sh`. It writes structured
+PASS/FAIL/BLOCKED results to a local log directory:
+
+~~~sh
+bash .flutter-harness/bin/check.sh . quick mobile-web
+bash .flutter-harness/bin/check.sh . standard mobile-web
+bash .flutter-harness/bin/check.sh . full mobile-web
+~~~
+
+The lab CI fixture omits Web compilation from routine PR checks; it remains
+available through an explicitly dispatched full validation workflow.
