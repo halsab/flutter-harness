@@ -1,16 +1,13 @@
 # Flutter Harness contributor instructions
 
-This repository contains the harness, not the user's Flutter application.
+This repository contains the reusable harness, not the user's Flutter application.
 
-- Follow the upstream Superpowers workflows. Do not vendor or rewrite Superpowers.
-- Prefer official Dart/Flutter tools and reproducible scripts.
-- Never claim a test, simulator, build or MCP connection passed without actually running it.
-- Never rewrite or delete an existing project's configuration or source during installation.
-- Work on a feature branch, commit after verified milestones, and open a pull request. Never auto-merge.
-- Approval from the project owner is mandatory before updating accepted golden screenshots.
-- Keep secrets, production credentials and private data out of Git, logs and public PRs.
-- Mobile is the default profile. Flutter Web is optional.
-- Treat a BLOCKED check as not verified; report the exact missing prerequisite.
-- The lab project is separate: https://github.com/halsab/flutter-harness-lab.
-- Model and permission rules are versioned in both OpenCode profile templates; do not bypass denied tool operations.
-- Ask approval before external-directory access or Git pushes; never mistake CLI prompts for GitHub branch protection.
+- Default product workflow: one concise design checkpoint only when material decisions require it, then plan/implement/test/review/PR without asking the user to approve a second technical plan.
+- Preserve the upstream Superpowers project unchanged. Its mandatory interactive approvals are incompatible with the autonomous default; it is available only as a separately opted-in interactive workflow.
+- The default model is GPT-6 Luna medium. GPT-6.2 Sol medium is for complex architecture or hard diagnosis, not routine calls. Prefer one Luna medium final reviewer pass; avoid repeated full reviews.
+- Work on a feature branch in the current checkout by default. Preserve unrelated local edits; never reset, stash, commit or stage them without authorization.
+- Prefer official Flutter/Dart tools, targeted tests and deterministic scripts. Use Maestro for Android/iOS mobile scenarios and Playwright for Web. Do not loop on incompatible Maestro Web semantics.
+- Never claim a test, iOS Simulator run, build, UI observation or model-cost reduction without evidence. Report PASS / FAIL / BLOCKED / SKIPPED separately.
+- After an agreed feature is implemented, attempt push + PR by default. Respect the interactive push permission; report BLOCKED if denied. The owner alone merges PRs or approves changed golden screenshots.
+- No destructive Git operations, force pushes, releases, production secrets or permission bypass. MCP and shell permissions are guardrails, not a sandbox.
+- Keep session usage reports local and sanitized; do not commit private conversation exports. This repo is separate from https://github.com/halsab/flutter-harness-lab.
