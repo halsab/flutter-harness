@@ -35,7 +35,7 @@ fi
 
 if [[ ! -e "$TARGET/opencode.json" && ! -e "$TARGET/opencode.jsonc" ]]; then
   cp "$ROOT/templates/opencode-${PROFILE}.jsonc" "$TARGET/opencode.jsonc"
-  info "Created OpenCode V2 config with Superpowers and MCP servers."
+  info "Created lean autonomous OpenCode V2 config with MCP servers."
 else
   info "Preserved existing OpenCode config. Merge with templates/opencode-${PROFILE}.jsonc manually."
 fi
@@ -48,15 +48,19 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
-Use Superpowers for planning, execution and review. For sequential tasks,
-create a feature branch in the current checkout (no separate worktree or
-routine worktree/branch question); in this lab branch from app. Preserve
-unrelated local changes, including opencode.jsonc, and stage only task files.
-Work in feature branches, commit verified milestones, open pull requests;
-never merge automatically.
-Respect OpenCode model routing and permission prompts; do not bypass denied actions.
-Only the human can approve updates to golden image baselines.
-Report PASS / FAIL / BLOCKED / SKIPPED accurately.
+
+User requests describe outcomes; handle technical orchestration autonomously.
+Ask only material product/architecture/security questions, and seek at most one
+design signoff. No second plan approval or execution-mode question.
+For sequential tasks, create a feature branch in this checkout from app (lab)
+or the project's documented integration branch; no routine worktree prompt.
+Preserve unrelated local changes (especially opencode.jsonc); stage task files only.
+Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
+Test Android/iOS with Maestro mobile, Web with Playwright; report real outcomes.
+Obtain one focused final review, then push and create a PR to the integration
+branch, requesting any required tool approval. Never auto-merge or force-push.
+Only the owner accepts changed golden baselines. Honor denied tool operations.
+Report PASS / FAIL / BLOCKED / SKIPPED accurately and keep updates concise.
 <!-- flutter-harness:end -->
 INSTRUCTIONS
   info "Added project instructions."
