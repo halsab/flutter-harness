@@ -11,11 +11,11 @@
 - The `app` branch is for observing agent-written functionality, not testing existing-project installation.
 
 ## Intended workflow
-1. User and agent agree on scope and acceptance criteria (Superpowers).
-2. Agent creates a feature branch, records a plan, and changes code in small verified steps.
+1. User describes the desired outcome. Only material product/architecture ambiguities are discussed; at most one design checkpoint. The technical plan is internal, not separately approved.
+2. Agent creates a feature branch in the current checkout and changes code in small verified steps. Ordinary branch/worktree and execution mode choices are not user-facing.
 3. Agent commits each meaningful checkpoint.
-4. Agent runs relevant static, unit/widget and runtime/E2E checks.
-5. Agent pushes the branch and creates a PR with evidence, failures and any BLOCKED checks.
+4. Agent runs relevant static, unit/widget and runtime/E2E checks. Maestro is mobile-only by default; Playwright handles Web; report Android, iOS and Web evidence separately.
+5. Agent runs one independent, read-only final diff review (with at most one targeted recheck for a major fix), then requests push permission, pushes and creates a PR with evidence, failures and any BLOCKED checks.
 6. Only the human merges; only the human accepts new golden baselines.
 
 ## Platform profiles
@@ -31,7 +31,7 @@
 - No self-hosted runner on the owner's MacBook in v0.
 - Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
 - Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
-- Tools may be visible per selected profile, while skill instructions are loaded as needed.
+- Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.\n- Prefer Luna medium for implementation and review. Sol medium is available for complex architecture or hard diagnosis, not automatic on every feature.\n- Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
 
 ## Development status
 
