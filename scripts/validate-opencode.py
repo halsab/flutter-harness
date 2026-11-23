@@ -107,8 +107,12 @@ def validate(filename, profile):
         ensure(servers["playwright"].get("command") == ["npx", "--yes", "@playwright/mcp@0.0.86"], "Playwright pin changed")
         ensure(servers["chrome-devtools"].get("command") == ["npx", "--yes", "chrome-devtools-mcp@1.13.0"], "Chrome DevTools pin changed")
     ensure(
-        data.get("plugins") == [],
-        "default autonomous profile must not load mandatory interactive Superpowers",
+        data.get("plugins") == [
+            "-superpowers",
+            "-superpowers.*",
+            "-superpowers@git+https://github.com/obra/superpowers.git#v7.0.2",
+        ],
+        "autonomous profile must explicitly exclude globally merged Superpowers",
     )
     print(f"PASS OpenCode {profile}: {filename}")
 
