@@ -1,64 +1,110 @@
-# OpenCode model routing (ChatGPT Plus)
+# OpenCode model routing, autonomy and usage
 
-This harness uses project-level model preferences in `opencode.jsonc`; it does not store credentials.
+Flutter Harness implements a **short-request → one product checkpoint (when
+needed) → implementation/tests/review → PR** workflow. A design approval also
+approves routine technical planning and execution within that design. A second
+plan signoff, choosing subagent/worktree strategy, or manually requesting a PR
+is not part of the default experience.
 
 | Work | Agent | Model | Reasoning |
 | --- | --- | --- | --- |
-| Implementation, tests, tool runs and PR preparation | `build` (default) | GPT-6 Luna | high |
-| Manual planning | `plan` | GPT-6.2 Sol | medium |
-| Delegated architecture and hard diagnosis | `architect` | GPT-6.2 Sol | medium |
-| Independent review | `reviewer` | GPT-6.2 Sol | medium |
-| Routine delegated tasks | `general` | GPT-6 Luna | medium |
-| File search and codebase exploration | `explore` | GPT-6 Luna | low |
-| Session compaction, titles and summaries | `compaction`, `title`, `summary` | GPT-6 Luna | low |
+| Default implementation and tooling | `build` | GPT-6 Luna | medium |
+| Focused independent final diff review | `reviewer` | GPT-6 Luna | medium |
+| Codebase search when beneficial | `explore` | GPT-6 Luna | low |
+| Routine delegated work | `general` | GPT-6 Luna | medium |
+| Complex architecture or hard diagnosis | `architect` | GPT-6.2 Sol | medium |
+| Explicit manual planning | `plan` | GPT-6.2 Sol | medium |
+| Title, summary, compaction | maintenance agents | GPT-6 Luna | low |
 
-## Setup and verification
+The autonomous default does **not** force an architect consultation for
+simple CRUD features. Use `reviewer` once with a fresh subagent context: pass
+requirements and changed code, without the author's self-assessment. Request
+concrete failing scenarios and evidence, not a numerical score or generic
+style complaints. `build` fixes confirmed important issues and can request
+**one targeted recheck** of a high-risk correction. Do not start a five-round
+review loop by default.
 
-1. In OpenCode run `/connect`, choose OpenAI and **Sign in with ChatGPT** to use an eligible ChatGPT plan. Do not supply an OpenAI API key if your intention is to use subscription usage.
-2. Open the Flutter project, run `opencode service restart` in a terminal and start a **new session**. OpenCode loads the project config from the repository root.
-3. Check that the models are available using `opencode models` or `/models`. Verify the selected session model and variant; a model named in a config file alone does not prove the provider permits it.
-4. Inspect the effective settings with `opencode debug config`; redact any secrets before sharing logs.
-5. Use the `build` agent as the Luna-led orchestrator. Before substantial work ask it explicitly to delegate design to `architect`, and request `reviewer` once before the PR. A subagent uses its configured model; switching primary agents in an existing session **does not necessarily switch the session's selected model**.
-6. If you manually use the primary `plan` agent, start a new session and explicitly select GPT-6.2 Sol **medium**; then start a fresh Luna coding session. Keep Sol at or below medium.
+This adapts the useful independent-review principle from
+[Loop Code Review](https://github.com/di-sukharev/loop-code-review-skill)
+without installing its repeated reviewer/fixer loop. The original skill's
+up-to-five rounds and strong high-effort model for stored-data changes would
+increase usage and conflict with our read-only reviewer. The related
+[Code Scout](https://github.com/di-sukharev/code-scout-skill) is helpful only
+when locating code in a large/unfamiliar repository; for a tiny Flutter app,
+one extra subagent can cost more than it saves. The author's
+[Orchestration](https://github.com/di-sukharev/orchestration-skill) and
+[Refactoring](https://github.com/di-sukharev/refactoring-skill) use expensive
+multi-agent loops and remain optional.
 
-The initial setup is **not** a hard spending or usage cap. The subscription has included allowance and limits; additional credits require a separate opt-in where applicable. Check ChatGPT **Settings → Usage** for usage by connected apps and any app limits. Avoid repeated full-codebase analysis, needless subagent calls and very long sessions.
+## Interactive design versus autonomous delivery
 
-Model identifiers used by this profile: `openai/gpt-6.2-sol` and `openai/gpt-6-luna`. Reasoning variants are selected with `#low`, `#medium` or `#high` on agent model references. No authentication tokens belong in this repository.
+Superpowers is a separate, optional **interactive** workflow. It is not
+loaded by the default profile, because the first lab trial showed mandatory
+design, writing-plans and execution-choice gates. Do not circumvent those
+requirements when the owner explicitly opts into Superpowers. The default
+project skill instead encodes a lean TDD-style process and a single design
+checkpoint. In OpenCode V2, `skill` deny permissions hide the named
+interactive skills if installed globally.
 
-Reference: https://opencode.ai/docs/agents, https://opencode.ai/docs/models, https://opencode.ai/docs/providers.
+Superpowers may also be installed globally. Plugin lists from multiple
+OpenCode configuration sources can be merged; after installing the new
+profile, inspect `opencode debug config` and verify the effective plugin
+and skill set in a **new session**. Static CI cannot demonstrate that a
+previously running session has unloaded the old plugin.
 
-## Safety and approval boundaries
+## Tools and context budget
 
-- Each project's OpenCode V2 `permissions` rules ask before access outside
-  its workspace or worktree and before `git push` / `gh api` operations.
-- The common `gh pr merge` command, force-push patterns, releases and
-  `flutter pub publish` are denied by project policy. Project owner merges PRs
-  in GitHub after review.
-- `architect` and `reviewer` deny edits and all shell commands by default;
-  they allow only read-only `git status`, `git diff`, `git show` and
-  `git log`. Routine test execution belongs to `build`.
-- These rules **are not a security sandbox**. Shell argument parsing is
-  best-effort; alternate commands, APIs and external MCP tools may mutate
-  state. Never treat a `deny` rule as a substitute for human approval or
-  repository-side branch protection. Do not evade a denied operation.
-- Enable branch protection/rulesets for the lab's `main` and `app` branches
-  in GitHub Settings → Rules → Rulesets (or Branches). Block force pushes,
-  require PRs and the relevant passing CI check. These settings may require
-  manual repository administration and are not applied by this template.
+- Maestro validates mobile Android/iOS interfaces and relaunch persistence.
+  Use **Playwright** for Flutter Web. Do not spend dozens of attempts trying
+  Maestro Web text selectors or unsupported keyboard commands.
+- Chrome DevTools MCP remains configured but `disabled: true` by default.
+  Enable it temporarily only when Playwright cannot diagnose a browser bug.
+- For a repeated failing tool command, stop after two attempts at the same
+  approach, inspect a small diagnostic and change strategy or report a blocker.
+- Minimize large search outputs, repeated config dumps, simultaneous MCP
+  discovery, long plans and unnecessary full-codebase reviews. The model
+  processes tool outputs in context. The MCP server itself is not necessarily
+  a separate paid LLM call.
+- These are **soft usage preferences**, not token, money or call caps. A
+  cheaper model can also spend more total tokens if it loops; compare
+  observed results rather than assuming exact savings.
 
-## Automated checks
-
-From the `flutter-harness` repository root:
+Use the stdlib-only session reporter in the harness repository:
 
 ```bash
-python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
-python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
+opencode session export SESSION_ID --sanitize > /tmp/parent.json
+python3 scripts/session-usage.py /tmp/parent.json /tmp/child.json
 ```
 
-The checks use Python's standard library and **do not call any LLM**. The
-harness CI checks both profiles and installs each twice to test idempotency.
-The lab CI checks its own agent/model/permission configuration. CI cannot
-validate real ChatGPT authentication, the currently selected session model,
-reasoning effort accepted by a provider, or subagent handoff: test those in a
-new local OpenCode session with actual tool output. Keep the Sol default at
-medium and avoid repeatedly launching unnecessary review subagents.
+Include exports of child sessions to account for delegated models. The
+report lists raw input/output/reasoning/cache counters, calls to tools, and
+agent/model variants. It is not a monetary bill or an exact context-window
+cost. Keep exports out of git. Individual invocations and reasoning efforts
+must be checked in actual session exports; static config tests only verify
+declared defaults.
+
+## GitHub and authorization
+
+Use a feature branch in the checkout, preserve unrelated local edits, stage
+only task files. Finish a normal feature by pushing the branch and creating a
+PR into `app` (lab) or the documented integration branch. Do not treat a
+local commit as finished delivery. An OpenCode permission prompt for
+`git push`, external directories or `gh api` is not optional. Request
+approval, honor denials, report BLOCKED when required and **never auto-merge**.
+GitHub rulesets remain the server-side protection. Never update accepted
+golden baselines without the owner's explicit decision.
+
+## Model authentication
+
+Use OpenCode's OpenAI **Sign in with ChatGPT** option for eligible subscription
+access rather than supplying an API key unintentionally. Select the default
+`build` agent in a new session; switching agents in an old session may not
+switch the selected model variant. Run `opencode models` and
+`opencode debug config`, and confirm actual calls in sanitized exports.
+ChatGPT subscription allowances and potential provider limits still apply.
+
+References:
+- https://opencode.ai/docs/agents
+- https://opencode.ai/docs/permissions
+- https://opencode.ai/docs/skills
+- https://opencode.ai/docs/mcp-servers
