@@ -116,6 +116,41 @@ full builds. It writes logs and TSV summaries inside
 those are separate local checks. The script's full level builds Android APK,
 iOS Simulator (on macOS) and Web for the mobile-web profile.
 
+## Deterministic Web Playwright E2E and platform evidence
+
+For the `mobile-web` profile, run Playwright against a local **release
+build** instead of the Flutter/Chrome debug-service connection:
+
+```sh
+python3 .flutter-harness/bin/web-preview.py start
+# Playwright MCP navigates to the printed READY URL and exercises real UI
+python3 .flutter-harness/bin/web-preview.py status
+python3 .flutter-harness/bin/web-preview.py stop
+```
+
+The helper builds with local Web resources, launches a Python HTTP server bound
+to `127.0.0.1` on an available port, and writes logs/state outside the
+repository under `~/.cache/flutter-harness`. Flutter officially supports
+serving `build/web` via a local HTTP server:
+https://docs.flutter.dev/deployment/web .
+**HTTP READY is not E2E PASS**; only successful Playwright UI assertions are.
+
+Run Android Maestro, iOS Maestro and Web Playwright independently; a failure
+on one platform never excuses skipping the others. Before preparing a PR,
+write `.flutter-harness/verification.json` with Android/iOS/Web outcomes.
+Each PASS needs `status`, `target`, `tool`, `assertions`, and a concrete
+`evidence` reference. BLOCKED, FAIL and SKIPPED need `reason`.
+
+```sh
+python3 .flutter-harness/bin/verify-e2e.py .flutter-harness/verification.json --profile mobile-web
+```
+
+A missing or unverified platform causes INCOMPLETE: the agent may open a
+**draft PR** documenting blockers, never claim finished verified delivery.
+The gate checks report completeness, not whether the agent's references
+actually prove execution; audit the OpenCode session logs for that. The
+installer ignores Playwright snapshots and local verification reports in Git.
+
 ## Models, permissions and verification
 
 OpenCode V2 defaults to **GPT-6 Luna medium** for implementation and focused
