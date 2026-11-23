@@ -69,6 +69,7 @@ previously running session has unloaded the old plugin.
 
 ## Tools and context budget
 
+- For Web Playwright, use `web-preview.py` to compile and serve `build/web` on a loopback port without Chrome's debug-service handshake. HTTP READY is not a UI PASS. Run all platforms independently and gate final DONE on the platform verification report. An incomplete report permits only a draft PR with explicit limitations.
 - Discover Android and iOS devices first (`flutter devices`, Maestro device listing;
   on macOS check `xcrun simctl list devices booted`). A booted iOS Simulator
   must receive a Maestro UI scenario for any relevant mobile feature even if

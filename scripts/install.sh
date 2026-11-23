@@ -39,6 +39,23 @@ else
   info "Preserved existing PR verification."
 fi
 
+if [[ "$PROFILE" == "mobile-web" && ! -e "$TARGET/.flutter-harness/bin/web-preview.py" ]]; then
+  cp "$ROOT/scripts/web-preview.py" "$TARGET/.flutter-harness/bin/web-preview.py"
+  info "Installed deterministic Web preview."
+fi
+
+if [[ ! -e "$TARGET/.flutter-harness/bin/verify-e2e.py" ]]; then
+  cp "$ROOT/scripts/verify-e2e.py" "$TARGET/.flutter-harness/bin/verify-e2e.py"
+  info "Installed platform E2E completeness gate."
+fi
+
+touch "$TARGET/.gitignore"
+for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json'; do
+  if ! grep -Fxq "$ignored" "$TARGET/.gitignore"; then
+    printf '%s\n' "$ignored" >> "$TARGET/.gitignore"
+  fi
+done
+
 if [[ ! -e "$TARGET/.flutter-harness/config.json" ]]; then
   printf '{\n  "profile": "%s",\n  "source": "https://github.com/halsab/flutter-harness"\n}\n' "$PROFILE" > "$TARGET/.flutter-harness/config.json"
   info "Created .flutter-harness/config.json ($PROFILE)"
@@ -79,7 +96,12 @@ Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
 Check actual session model variant in the UI; it can override config defaults.
 Use Luna-low explore for broad unfamiliar-code mapping only, not routine searches.
 Discover Android and iOS devices; test on a booted iOS Simulator as well as
-Android via Maestro, and Web via Playwright. Builds are not UI tests.
+Android via Maestro, and Web via Playwright on the Web preview URL; never
+use flutter run -d chrome as the Playwright server. Builds are not UI tests.
+Run platform checks independently. Save local per-platform outcomes and
+real tool evidence in .flutter-harness/verification.json. Run verify-e2e.py
+before final review/PR; missing platform checks are INCOMPLETE, so use a
+DRAFT PR and do not claim delivery DONE.
 Check exact intended post-action text; never change an expected value to hide
 an input bug. Report Android/iOS/Web with PASS/FAIL/BLOCKED/SKIPPED evidence.
 Review the complete task diff against the integration base, including new files.
