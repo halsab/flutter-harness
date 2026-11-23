@@ -48,8 +48,12 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
-Use Superpowers for planning, execution and review. Work in feature branches,
-commit verified milestones, open pull requests; never merge automatically.
+Use Superpowers for planning, execution and review. For sequential tasks,
+create a feature branch in the current checkout (no separate worktree or
+routine worktree/branch question); in this lab branch from app. Preserve
+unrelated local changes, including opencode.jsonc, and stage only task files.
+Work in feature branches, commit verified milestones, open pull requests;
+never merge automatically.
 Respect OpenCode model routing and permission prompts; do not bypass denied actions.
 Only the human can approve updates to golden image baselines.
 Report PASS / FAIL / BLOCKED / SKIPPED accurately.
