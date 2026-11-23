@@ -9,9 +9,9 @@ remains optional for interactive design sessions.
 **Status: experimental (November 2026); first end-to-end lab feature PR produced.**
 The SDK starter has run on an Android emulator, iOS Simulator and Chrome on
 the owner's MacBook. Flutter quick/standard/full checks and basic MCP
-connectivity were exercised locally. This is **not** yet a production-ready
-autonomous development system; reproducible device UI flows and a complete
-agent-authored feature PR remain to be validated.
+connectivity were exercised locally. This is **not yet a production-ready autonomous development system**;
+the initial lab task-list PR (#5) was completed, but the revised lean workflow
+still requires a local end-to-end validation after merging.
 
 Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 
