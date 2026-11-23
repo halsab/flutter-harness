@@ -1,14 +1,13 @@
 # Flutter Harness contributor instructions
 
-This repository contains the reusable harness, not the user's Flutter application.
+The reusable Harness aims for quick, stable, high-quality autonomous Flutter delivery.
 
-- Default product workflow: one concise design checkpoint only when material decisions require it, then plan/implement/test/review/PR without asking the user to approve a second technical plan.
-- Preserve the upstream Superpowers project unchanged. Its mandatory interactive approvals are incompatible with the autonomous default; it is available only as a separately opted-in interactive workflow.
-- The configured default model is GPT-6 Luna medium, but the OpenCode UI may retain a session-specific High override; verify the active session variant and audit actual usage rather than trusting config alone. GPT-6.2 Sol medium is for complex architecture or hard diagnosis, not routine calls. Prefer one Luna medium final reviewer pass with concrete scenarios and evidence; allow at most one targeted recheck. Use Luna-low explore only for broad unfamiliar-code search.
-- Work on a feature branch in the current checkout by default. Preserve unrelated local edits; never reset, stash, commit or stage them without authorization.
-- Prefer official Flutter/Dart tools, targeted tests and deterministic scripts. Discover Android/iOS devices; if an iOS Simulator is booted, run Maestro on it as well as Android (iOS build alone is insufficient). Use Playwright for Web with the deterministic built Web preview, not a Chrome debug-service run. Run all platform E2E tests independently, record actual tool evidence, and use verify-e2e.py; if any platform is incomplete, create only a DRAFT PR. Check exact post-action values without adapting assertions to unexpected text. Do not loop on incompatible Maestro Web semantics.
-- The read-only reviewer must obtain the complete task diff; run separate allowed Git status / merge-base / diff commands, not chained shells, and use read for files. Permission-denied or missing diff coverage means review OPEN, not PASSED.
-- Never claim a test, iOS Simulator run, build, UI observation or model-cost reduction without evidence. Report PASS / FAIL / BLOCKED / SKIPPED separately for Android, iOS and Web.
-- After an agreed feature is implemented, attempt push + PR by default. Respect the interactive push permission; report BLOCKED if denied. The owner alone merges PRs or approves changed golden screenshots.
-- No destructive Git operations, force pushes, releases, production secrets or permission bypass. MCP and shell permissions are guardrails, not a sandbox.
-- Keep session usage reports local and sanitized; do not commit private conversation exports. This repo is separate from https://github.com/halsab/flutter-harness-lab.
+- One short feature request -> implementation -> minimal verification -> PR; no redundant technical approvals, worktree choice or repeated planning.
+- Default GPT-6 Luna medium for build; per-session UI variant may override config. Reserve Sol/extra agents for genuinely complex work.
+- Keep local changes safe; stage only task files, never auto-merge, force-push, publish or bypass permission denials.
+- Default code gate: one check.sh standard (format, analyzer, fast unit/widget tests). Add focused Dart unit tests for business rules and persistence; widget tests only for meaningful stateful UI behavior. No tests for trivial labels/boilerplate or arbitrary coverage targets.
+- Device/browser integration tests are optional and risk-triggered, not automatic for every feature. Prefer repeatable scripted assertions and exit statuses, not free-form AI screenshot interpretation. Run only relevant platforms.
+- A hidden item under an active filter is not missing persisted data. Establish preconditions and verify state before classifying behavior as failed. Avoid repeated UI tool experiments.
+- Build agent self-reviews its diff once. Independent read-only reviewer only for high-risk data/security/architecture/concurrency or explicit request; at most one targeted follow-up.
+- Optional E2E not run is NOT RUN (not required), never a reason for mandatory Draft. Failed required checks and material unresolved issues keep Draft. Report actual checks honestly.
+- CI stays lightweight; no hosted mobile/browser E2E added merely because local tools are unreliable.

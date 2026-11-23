@@ -86,34 +86,26 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
 
-User requests describe outcomes; handle technical orchestration autonomously.
-Ask only material product/architecture/security questions, and seek at most one
-design signoff. No second plan approval or execution-mode question.
-For sequential tasks, create a feature branch in this checkout from app (lab)
-or the project's documented integration branch; no routine worktree prompt.
-Preserve unrelated local changes (especially opencode.jsonc); stage task files only.
-Use Luna medium by default; Sol medium only for genuinely hard design/diagnosis.
-Check actual session model variant in the UI; it can override config defaults.
-Use Luna-low explore for broad unfamiliar-code mapping only, not routine searches.
-Discover Android and iOS devices; test on a booted iOS Simulator as well as
-Android via Maestro, and Web via Playwright on the Web preview URL; never
-use flutter run -d chrome as the Playwright server. Builds are not UI tests.
-Run platform checks independently. Save local per-platform outcomes and
-real tool evidence in .flutter-harness/verification.json. Run verify-e2e.py
-before final review/PR; missing platform checks are INCOMPLETE, so use a
-DRAFT PR and do not claim delivery DONE.
-Check exact intended post-action text; never change an expected value to hide
-an input bug. Report Android/iOS/Web with PASS/FAIL/BLOCKED/SKIPPED evidence.
-Review the complete task diff against the integration base, including new files.
-For read-only reviewer shell, run Git status, merge-base and diff separately;
-no chained commands or subshells. Read files with the read tool, not cat.
-If the complete diff could not be inspected, review is OPEN, never PASSED.
-Require evidence-backed failure scenarios; one full review, one targeted recheck
-for material high-risk fixes. Mark unresolved findings OPEN, never PASSED.
-Then push and create a PR to the integration
-branch, requesting any required tool approval. Never auto-merge or force-push.
-Only the owner accepts changed golden baselines. Honor denied tool operations.
-Report PASS / FAIL / BLOCKED / SKIPPED accurately and keep updates concise.
+User requests describe outcomes; implement with minimal technical approvals.
+Use a feature branch from app (Lab) or the documented integration branch.
+Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
+Default model: GPT-6 Luna medium. Sol/extra agents only for difficult work.
+Run one standard check (format, analyze, fast Dart unit/widget tests).
+Write focused unit tests for important logic and widget tests only for stateful
+UI behavior. No tests for boilerplate, trivial styling or coverage quotas.
+Android/iOS/Web device/browser E2E are NOT required for ordinary features.
+Choose a minimal scripted integration check only when platform/critical risk
+actually demands it, or the user explicitly requests E2E.
+Do not infer a failed save from an item hidden by a selected filter.
+If optional E2E is not needed, report NOT RUN (not required), not BLOCKED.
+The legacy verify-e2e.py helper is optional, not a delivery gate.
+Default self-review the full task diff once; independent read-only reviewer
+only for security, sensitive data, migration, complex concurrency, large
+architecture or explicit user request. No repeated reviewer loops.
+If required checks pass, push with approval and create a normal PR into app.
+If a genuinely required check fails or a material finding remains, use Draft.
+Never auto-merge or force-push. Respect denied tool actions and golden approvals.
+Keep verification concise and report only actual command results.
 <!-- flutter-harness:end -->
 INSTRUCTIONS
   info "Added project instructions."
