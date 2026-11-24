@@ -12,11 +12,13 @@ is not part of the default experience.
 | Focused independent final diff review | `reviewer` | GPT-6 Luna | medium |
 | Codebase search when beneficial | `explore` | GPT-6 Luna | low |
 | Routine delegated work | `general` | GPT-6 Luna | medium |
-| Complex architecture or hard diagnosis | `architect` | GPT-6.2 Sol | medium |
-| Explicit manual planning | `plan` | GPT-6.2 Sol | medium |
+| Complex architecture or hard diagnosis | `architect` | GPT-6 Luna | medium |
+| Explicit manual planning | `plan` | GPT-6 Luna | medium |
 | Title, summary, compaction | maintenance agents | GPT-6 Luna | low |
 
-The autonomous default does not force an architect consultation or
+No default role routes to Sol or another premium model. Explicit user model
+selection remains possible; do not switch automatically. The autonomous
+default does not force an architect consultation or
 independent reviewer for simple features. The implementer checks the diff once,
 and the standard deterministic Flutter tests/analyzer supply ordinary
 verification. Call a fresh read-only Luna reviewer only for material security,

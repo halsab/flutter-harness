@@ -117,13 +117,14 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
 Read .flutter-harness/PRODUCT.md for the mandatory feature-first MVVM, UX,
-UI profile and design-system baseline. Default Adaptive, Flutter Web only.
+UI profile and design-system baseline. Default Material 3 on all platforms, Flutter Web only.
 Adopt the foundation before application delivery; do not disable the check.
 
 User requests describe outcomes; implement with minimal technical approvals.
 Use a feature branch from app (Lab) or the documented integration branch.
 Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
-Default model: GPT-6 Luna medium. Sol/extra agents only for difficult work.
+Default model: GPT-6 Luna medium, including planning and diagnosis.
+Do not automatically use Sol or another premium model.
 Format once with dart format lib test, then run one standard check.
 Never remove a failing acceptance test to make checks green. Risky persistent
 or destructive changes require a successful check and independent reviewer

@@ -6,7 +6,7 @@
 
 ## Product application architecture
 
-The canonical application baseline is [Product foundation](../templates/product/PRODUCT.md): feature-first MVVM, constructor injection, shared design system and Flutter-only platform profiles. The checker is a convention gate, not a complete semantic verifier. Existing Lab app adopts this in a focused migration; never rewrite the SDK starter on main.
+The canonical application baseline is [Product foundation](../templates/product/PRODUCT.md): feature-first MVVM, constructor injection, shared Material 3 design system on Android, iOS and Flutter Web. The checker is a convention gate, not a complete semantic verifier. Existing Lab app adopts this in a focused migration; never rewrite the SDK starter on main.
 
 ## Initial scope
 - **Only new, clean Flutter SDK projects.** No adoption or migration of existing applications in v0.
@@ -36,7 +36,7 @@ The canonical application baseline is [Product foundation](../templates/product/
 - Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
 - Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
 - Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.
-- Prefer Luna medium for implementation and review. Sol medium is available for complex architecture or hard diagnosis, not automatic on every feature.
+- Prefer Luna Medium for implementation, planning and focused diagnosis; reviewer effort follows the existing risk gate. No automatic premium-model escalation.
 - Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
 
 ## Development status
