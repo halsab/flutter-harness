@@ -17,7 +17,8 @@ Harness-owned baseline files below, merging intentional project overrides:
 - skills/flutter-harness/SKILL.md -> .opencode/skills/flutter-harness/SKILL.md
 - templates/opencode-<profile>.jsonc -> corresponding local OpenCode config;
   merge model routes and retain authentication, permissions and other user
-  settings. All built-in roles now use Luna. Confirm effective routes in a
+  settings. All routine roles use Luna; optional focused advisor uses Sol Medium.
+  Confirm effective routes in a
   fresh OpenCode session; existing sessions may retain old configuration.
 - Update only the Flutter Harness marked section in AGENTS.md to match
   scripts/install.sh. Preserve unrelated project instructions.
@@ -42,5 +43,5 @@ is migrated set ui_profile to universal and status active; run the standard
 checks and required visual inspection on the actual app.
 
 After this focused migration is accepted, design and implement new features
-in separate tasks. No automatic Sol escalation, no compulsory UIKit-like
+in separate tasks. No automatic Sol escalation (only the bounded advisor exception), no compulsory UIKit-like
 animations, no third-party visual kit for routine tasks.

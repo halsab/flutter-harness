@@ -14,11 +14,15 @@ is not part of the default experience.
 | Routine delegated work | `general` | GPT-6 Luna | medium |
 | Complex decomposition, architecture or hard diagnosis | `architect` | GPT-6 Luna | high |
 | Explicit manual planning | `plan` | GPT-6 Luna | high |
+| Optional focused architectural decision | `advisor` | GPT-6.2 Sol | medium |
 | Bounded implementation slice | `worker` | GPT-6 Luna | low |
 | Title, summary, compaction | maintenance agents | GPT-6 Luna | low |
 
-No default role routes to Sol or another premium model. Explicit user model
-selection remains possible; do not switch automatically. The autonomous
+Only optional advisor routes to Sol, for at most one compact consequential
+architectural decision per original task. The build parent gathers evidence
+and retains implementation, integration and verification. No premium whole-task
+planning, coding, review or automatic escalation on failure. See the advisor
+conditions in the orchestration guide. Explicit user model selection remains possible. The autonomous
 default does not force an architect consultation or
 independent reviewer for simple features. The implementer checks the diff once,
 and the standard deterministic Flutter tests/analyzer supply ordinary
@@ -54,7 +58,8 @@ previously running session has unloaded the old plugin.
 ## Large tasks: one flow, selective delegation
 
 The Medium build agent orchestrates; High architect plans across actual
-product/state/architecture dependencies; Low worker handles one bounded
+product/state/architecture dependencies; optional Sol Medium advisor resolves a
+compact difficult decision when justified; Low worker handles one bounded
 source/test slice. Use the [orchestration guide](../templates/product/ORCHESTRATION.md)
 and task-plan.py for dependency and file-conflict checks. Use at most two
 independent workers concurrently. Parent owns shared build/test state,
