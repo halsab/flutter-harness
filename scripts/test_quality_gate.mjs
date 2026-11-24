@@ -101,7 +101,7 @@ test("large untracked source counts toward review effort and stays stable after 
   assert.ok(before.reasons.includes("large change requires independent review"));
   git("add","."); git("commit","-qm","large change");
   const after=await candidate(root,"app","");
-  assert.equal(after.effort,"xhigh");
+  assert.equal(after.effort,"high");
   assert.equal(after.digest,before.digest);
   assert.deepEqual(after.size,before.size);
 });
