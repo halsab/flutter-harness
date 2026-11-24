@@ -154,8 +154,10 @@ case and, if useful, consult the Luna High architect once for focused
 diagnosis. Apply the recommendation and check the affected behavior.
 Ordinary format failures do not need escalation. Failed checks are work to
 fix, not an external blocker. If bounded recovery fails, report INCOMPLETE.
-Do not automatically switch or delegate to a more expensive model; Sol or
-other premium models require explicit user selection or permission.
+The only standing premium-model exception is one focused Sol Medium advisor
+consultation per original task under ORCHESTRATION.md. No premium build,
+whole-project planning/review or automatic failure-based escalation. Other
+premium use requires explicit user permission.
 Use one final standard check after implementation/review corrections. If
 independent review is required, it may run concurrently with deterministic
 checks on the unchanged candidate. Wait for review result without duplicate

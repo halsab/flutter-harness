@@ -15,7 +15,7 @@ proposed product rules, affected boundaries and a dependency graph, not
 code or a file-based checklist alone. High effort is more reasoning, not
 a larger context window. Parent resolves omissions and freezes the compact
 behavior contract. Consult again only for material newly discovered risk,
-not as a second default planning round. No automatic Sol.
+not as a second default planning round. No automatic premium escalation.
 
 Split by independently verifiable outcome and stable interfaces, not by an
 arbitrary line count or one agent per file. Include expected input/output,
@@ -25,6 +25,40 @@ sequential; settle interface contracts before dispatching consumers.
 For a significant visual change establish the intended design before
 delegating its implementation. A slice must be small enough for a worker
 to understand and check without rereading the entire project.
+
+## Optional focused architectural advisor (Sol Medium)
+
+Use Luna High for repository exploration, dependency analysis, product
+specification and decomposition. The parent may call advisor at most once
+per original task (including retries/resumes) if ALL are true:
+- The decision is consequential and genuinely difficult, with material
+  trade-offs, cross-boundary effects or costly-to-reverse consequences.
+- The relevant facts, constraints, contracts, callers and alternatives can
+  be summarized in a compact, self-contained packet without broad file reads.
+- A better decision is likely to avoid meaningful rework; normal Luna
+  planning is not simply being duplicated.
+
+Do not use advisor for ordinary work, code generation, exhaustive reviews,
+large-context investigation, or merely because a check failed. No automatic
+escalation after retries. It is the one standing premium exception and
+needs no separate owner approval under these conditions. Other premium
+model use requires explicit permission.
+
+Parent supplies one question, current product intent and behavior rules,
+the minimum decisive code/contract excerpts and observed evidence, known
+alternatives, and the expected decision. Initial prompt budget: aim for
+under 4,000 tokens of task-specific input, a concise answer (about 500 words
+or less), no whole logs or repository dumps. These are guidance, not hard
+token limits. If material evidence cannot fit, stay with Luna High instead.
+Advisor has no file-read/edit, shell or child delegation permission in the
+supplied profiles. It must identify missing facts instead of guessing.
+Return decision, rationale, alternatives rejected, affected invariants,
+side effects and concrete acceptance cases. Luna validates the decision
+against the real code, updates the product contract and decomposes the work.
+Record reason, actual model/effort and decision or unavailable outcome in
+the task state; do not retry advisor on resume. If unavailable or unresolved,
+continue with Luna High when safe, otherwise report the genuine blocker.
+No separate delivery or extra user-visible stop.
 
 ## Durable plan
 
@@ -72,7 +106,8 @@ Example plan.json (illustrative paths, replace with actual project paths):
 
 Use explicit concrete file paths for all material read/write conflicts.
 Use dependencies for semantic coupling even with no overlapping files.
-Only the parent edits the manifest and shared contracts.
+Only the parent edits the manifest and shared contracts. If advisor is
+used, retain its call status and decision in the task state across retries.
 Commands (from project root):
 
     python3 .flutter-harness/bin/task-plan.py check PATH/plan.json
@@ -119,7 +154,7 @@ switch agents, choose parallel vs sequential, or copy results. After each
 accepted slice select the next ready wave. Resume from the manifest after
 compaction. If there is no ready work and unresolved failure, diagnose
 the root cause and make a changed attempt rather than repeat the same
-prompt. Use bounded recovery; no premium escalation. Report INCOMPLETE
+prompt. Use bounded recovery; no automatic premium escalation. Report INCOMPLETE
 if still unresolved, preserving progress.
 
 Finally check complete, integrate and review cross-slice behavior against

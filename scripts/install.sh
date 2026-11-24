@@ -125,7 +125,9 @@ Use a feature branch from app (Lab) or the documented integration branch.
 Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
 Default build: GPT-6 Luna Medium. Complex planning/diagnosis: Luna High.
 Simple delegated slices: Luna Low. Follow the orchestration guide for large
-changes; one parent owns verification and delivery. No automatic premium model.
+changes; one parent owns verification and delivery. Optional Sol Medium
+advisor only for one compact consequential architectural decision per task;
+no premium implementation or automatic escalation.
 Format once with dart format lib test, then run one standard check.
 Never remove a failing acceptance test to make checks green. Risky persistent
 or destructive changes require a successful check and independent reviewer

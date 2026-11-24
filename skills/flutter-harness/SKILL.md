@@ -20,7 +20,9 @@ Inspect actual rendered screens for material UX changes on representative
 platforms/states as specified in PRODUCT.md; no AI-driven functional E2E ritual.
 Include UX and architecture in the same bounded reviewer. If useful, consult
 Luna High architect once for genuine complexity or two unsuccessful fixes
-to the same substantive failure. No automatic use of Sol or premium models. Anticipate meaningful rejected-write/reload scenarios
+to the same substantive failure. Sol Medium is allowed only through the optional
+focused advisor route described in ORCHESTRATION.md; no premium implementation
+or automatic failure-based escalation. Anticipate meaningful rejected-write/reload scenarios
 before coding; prefer targeted checks during iteration. Required review may
 run concurrently with standard checks on an unchanged candidate. Do not
 spawn parallel duplicate reviews. Preserve existing behavior and user data.
@@ -39,7 +41,11 @@ Only dispatch ready, nonconflicting slices, at most two workers at once.
 Parent owns checks, integration, shared files, actual visual evidence,
 recovery and PR. Await actual final child results; a session ID or idle
 partial report is not completion. No user-visible stop between slices.
-No premium model escalation and no extra reviewer per slice.
+Only the parent may invoke advisor (Sol Medium) once per original task for a
+consequential architectural decision with compact self-contained evidence.
+Not a mandatory second planning round, implementation or broad diagnosis.
+Record the reason and prior call in the durable plan or working context.
+No other premium escalation and no extra reviewer per slice.
 
 ## Five-stage workflow
 
@@ -60,7 +66,8 @@ Keep one read-only reviewer role. The delivery plugin selects the actual GPT-6 L
 | Medium: over 100 lines or 3 files, up to 400 lines and 8 files; or risk-flagged changes | High |
 | Large: over 400 changed lines or 8 files | Extra High (xhigh) |
 
-These are initial tuning thresholds, not quality quotas. A risk flag raises a small review to at least High. Large changes require independent review. Small routine edits still use the existing self-review policy; no mandatory independent reviewer for trivial changes. Select one level once, not three successive reviews. For required review the child session must actually use Luna at the required effort or stronger; a weaker variant cannot satisfy the publication gate. Never claim a variant was used without observing it; unsupported variants block required review rather than silently falling back. Manual planning and the read-only architect default to Luna High; the build parent remains Luna Medium, the bounded worker Luna Low. No automatic premium-model escalation.
+These are initial tuning thresholds, not quality quotas. A risk flag raises a small review to at least High. Large changes require independent review. Small routine edits still use the existing self-review policy; no mandatory independent reviewer for trivial changes. Select one level once, not three successive reviews. For required review the child session must actually use Luna at the required effort or stronger; a weaker variant cannot satisfy the publication gate. Never claim a variant was used without observing it; unsupported variants block required review rather than silently falling back. Manual planning and the read-only architect default to Luna High; the build parent remains Luna Medium, the bounded worker Luna Low. Only the narrowly scoped optional advisor uses
+Sol Medium; no premium implementation or blanket escalation.
 
 ## Enforced risk gate
 

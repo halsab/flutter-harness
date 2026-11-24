@@ -194,12 +194,124 @@
           "effect": "deny"
         }
       ]
+    },
+    "advisor": {
+      "description": "Optional focused architectural decision consultant. Sol Medium, at most one call per original task, only for a consequential difficult decision with a self-contained compact evidence packet. Compare viable options, side effects, invariants, decision and verification; return a concise answer or identify missing evidence. Never scan the repository, implement, run commands, delegate, review the whole task or request user input. Return control to Luna.",
+      "mode": "subagent",
+      "model": "openai/gpt-6.2-sol#medium",
+      "permissions": [
+        {
+          "action": "shell",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "question",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "browser",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "dart_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "maestro_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "playwright_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "chrome-devtools_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "xcode_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "xcodebuild_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "generate_image",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "webfetch",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "websearch",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "list",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     }
   },
   "providers": {
     "openai": {
       "models": {
         "gpt-6-luna": {
+          "settings": {
+            "reasoningEffort": "medium"
+          }
+        },
+        "gpt-6.2-sol": {
           "settings": {
             "reasoningEffort": "medium"
           }
