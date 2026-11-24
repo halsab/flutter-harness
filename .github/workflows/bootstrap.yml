@@ -128,6 +128,7 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           flutter create --empty --project-name harness_product_smoke --platforms=web "$tmp/app"
           python3 scripts/init-product.py "$tmp/app" --template templates/product
+          cp templates/product/lib/main.dart.template "$tmp/app/lib/main.dart"
           mkdir -p "$tmp/app/test"
           cp templates/product/smoke_test.dart.template "$tmp/app/test/adaptive_test.dart"
           cd "$tmp/app"

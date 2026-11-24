@@ -4,11 +4,18 @@ import 'package:material_ui/material_ui.dart' as m;
 
 import 'app_root.dart';
 import 'tokens.dart';
+import 'theme.dart';
 
 class AppPage extends StatelessWidget {
-  const AppPage({super.key, required this.title, required this.child});
+  const AppPage({
+    super.key,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
   final String title;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -23,10 +30,19 @@ class AppPage extends StatelessWidget {
     );
     return usesCupertino(context)
         ? c.CupertinoPageScaffold(
-            navigationBar: c.CupertinoNavigationBar(middle: Text(title)),
+            navigationBar: c.CupertinoNavigationBar(
+              middle: Text(title),
+              trailing: trailing,
+            ),
             child: body,
           )
-        : m.Scaffold(appBar: m.AppBar(title: Text(title)), body: body);
+        : m.Scaffold(
+            appBar: m.AppBar(
+              title: Text(title),
+              actions: [if (trailing != null) trailing!],
+            ),
+            body: body,
+          );
   }
 }
 
@@ -162,4 +178,46 @@ Future<bool> confirmAction(
         ),
       ) ??
       false;
+}
+
+class AppStateMessage extends StatelessWidget {
+  const AppStateMessage({
+    super.key,
+    required this.title,
+    this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String title;
+  final String? message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: AppTokens.pagePadding,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          style: AppTextStyles.heading(context),
+          textAlign: TextAlign.center,
+        ),
+        if (message != null) ...[
+          const SizedBox(height: AppTokens.space8),
+          Text(
+            message!,
+            style: AppTextStyles.body(context),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (actionLabel != null && onAction != null) ...[
+          const SizedBox(height: AppTokens.space16),
+          AppButton(label: actionLabel!, onPressed: onAction),
+        ],
+      ],
+    ),
+  );
 }

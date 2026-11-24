@@ -169,7 +169,7 @@ export async function registerQualityGate(ctx, root, base, taskKey) {
       "Original requirement: " + (v.task.request || "(see task prompt)"),
       "Risk flags: " + (v.change.reasons.join("; ") || "requested review"),
       v.change.removed.length ? "Tests removed after a failed run: " + v.change.removed.join("; ") : "",
-      "For rejected persistence writes, verify the real repository against a seeded storage double that rejects only the write, not a replacement empty store. Assert reload and preserved records. Reject unsupported claims, missing important assertions, and removed failing tests without a valid replacement.",
+      v.change.reasons.some(r => /persistent data|destructive|tests disappeared/.test(r)) ? "For rejected persistence writes, verify the real repository against a seeded storage double that rejects only the write, not a replacement empty store. Assert reload and preserved records. Reject unsupported claims, missing important assertions, and removed failing tests without a valid replacement." : "Reject unsupported claims and missing important assertions.",
       v.change.reasons.some(r => r.includes("material UI")) ? "Apply .flutter-harness/PRODUCT.md: verify architecture, design-system reuse, visual hierarchy, accessibility and actual rendered evidence for material UI changes. If required visual evidence is missing or cannot be inspected, report CHANGES_REQUIRED; do not claim visual PASS from source alone. Architecture-only changes do not need screenshots." : "",
       "End with exactly VERDICT: PASS or VERDICT: CHANGES_REQUIRED on its own last line. PASS means no unresolved material findings; if evidence is incomplete, use CHANGES_REQUIRED.",
     ].filter(Boolean).join("\n");

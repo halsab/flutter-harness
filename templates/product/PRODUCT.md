@@ -106,7 +106,7 @@ Installer copies this policy, product.json and starter templates without
 overwriting app source or installing dependencies. Pending adoption means
 the project needs a first implementation/migration; ordinary local checks
 fail until product foundation is activated. On a fresh app or explicit
-migration, copy/adapt the starter with `python3 .flutter-harness/bin/init-product.py .`,
+migration, copy/adapt the starter and composition-root skeleton with `python3 .flutter-harness/bin/init-product.py .`,
 choose only needed components, move code and tests to the specified structure,
 wire AppRoot and feature ViewModels, and change product.json status to active.
 Do not mark active before actual integration. Pending is permitted in CI only
