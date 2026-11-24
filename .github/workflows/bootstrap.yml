@@ -90,6 +90,11 @@ jobs:
             test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
             test -f "$tmp/.flutter-harness/bin/maestro.sh"
             test -f "$tmp/.flutter-harness/bin/check.sh"
+            test -f "$tmp/.flutter-harness/bin/check-product.py"
+            test -f "$tmp/.flutter-harness/bin/init-product.py"
+            test -f "$tmp/.flutter-harness/PRODUCT.md"
+            test -f "$tmp/.flutter-harness/product.json"
+            test -f "$tmp/.flutter-harness/templates/product/lib/design_system/design_system.dart.template"
             test -f "$tmp/.flutter-harness/bin/verify-pr.sh"
             test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
             test -f "$tmp/.opencode/plugins/delivery-guard/guard.mjs"
@@ -105,3 +110,28 @@ jobs:
             python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
             rm -rf "$tmp"
           done
+
+  adaptive-starter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.1'
+          channel: stable
+          cache: true
+      - name: Compile and exercise the actual starter
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          flutter create --empty --project-name harness_product_smoke --platforms=web "$tmp/app"
+          python3 scripts/init-product.py "$tmp/app" --template templates/product
+          mkdir -p "$tmp/app/test"
+          cp templates/product/smoke_test.dart.template "$tmp/app/test/adaptive_test.dart"
+          cd "$tmp/app"
+          flutter pub add 'material_ui:^1.1.0' 'cupertino_ui:^1.1.7'
+          dart format lib test
+          flutter analyze
+          flutter test

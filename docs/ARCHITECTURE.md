@@ -4,6 +4,10 @@
 - `flutter-harness`: shared tooling, installer, skills and scripts.
 - `flutter-harness-lab`: `main` is a Flutter SDK-generated default project; `app` initially points to the **same clean starter**. The agent implements test tasks on branches from the clean baseline and may grow `app` over time.
 
+## Product application architecture
+
+The canonical application baseline is [Product foundation](../templates/product/PRODUCT.md): feature-first MVVM, constructor injection, shared design system and Flutter-only platform profiles. The checker is a convention gate, not a complete semantic verifier. Existing Lab app adopts this in a focused migration; never rewrite the SDK starter on main.
+
 ## Initial scope
 - **Only new, clean Flutter SDK projects.** No adoption or migration of existing applications in v0.
 - The lab `main` branch remains the untouched Flutter SDK starter. Lab PR #5 adds the first agent-authored task manager to `app` when merged; do not ship application-specific fixtures in the reusable harness.
