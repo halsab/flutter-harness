@@ -26,6 +26,21 @@ jobs:
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
       - name: Verify OpenCode delivery-guard logic (no model calls)
         run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs
+      - name: Check runner stops at formatting failure
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/project" "$tmp/bin"
+          touch "$tmp/project/pubspec.yaml"
+          printf '#!/bin/sh\nexit 1\n' > "$tmp/bin/dart"
+          printf '#!/bin/sh\ntouch "%s/flutter-was-called"\nexit 0\n' "$tmp" > "$tmp/bin/flutter"
+          chmod +x "$tmp/bin/dart" "$tmp/bin/flutter"
+          if PATH="$tmp/bin:$PATH" HARNESS_ARTIFACTS_DIR="$tmp/logs" bash scripts/check.sh "$tmp/project" standard mobile; then
+            echo "Expected format failure" >&2
+            exit 1
+          fi
+          test ! -f "$tmp/flutter-was-called"
       - name: Verify token usage reporter (no model calls)
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Verify Maestro shim without real devices

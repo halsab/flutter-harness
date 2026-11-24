@@ -24,8 +24,8 @@ export function classify(paths, request = "", removed = [], diff = "") {
     reasons.push("persistent data, storage or sensitive operation changed");
   }
   if (paths.some(p => p.startsWith("lib/")) &&
-      (/(?:bulk\s+delet|delete\s+all|clear\s+all|mass\s+delet|удал\w*\s+(?:все|всех)|массов\w*\s+удал)/iu.test(request) ||
-      /(?:\bdeleteAll\w*\(|\bdeleteCompletedTasks\s*\(|\bclearAll\w*\(|\bDROP\s+TABLE\b)/i.test(diff))) {
+      (/(?:bulk\s+delet|delete\s+all|clear\s+all|mass\s+delet|удал\p{L}*\s+(?:все|всех|всё)|массов\p{L}*\s+удал)/iu.test(request) ||
+      /(?:\bdelete(?:All|Completed|Many|Bulk)\w*\s*\(|\b(?:clear|remove)All\w*\s*\(|\bDROP\s+TABLE\b)/i.test(diff))) {
     reasons.push("destructive or bulk operation");
   }
   if (removed.length) reasons.push("tests disappeared after a failed check: " + removed.join("; "));
