@@ -23,8 +23,8 @@ test("review effort scales with diff size and risk, not the builder's choice", (
   assert.equal(reviewEffort({files:3,lines:101}),"high");
   assert.equal(reviewEffort({files:4,lines:20}),"high");
   assert.equal(reviewEffort({files:8,lines:400}),"high");
-  assert.equal(reviewEffort({files:1,lines:401}),"xhigh");
-  assert.equal(reviewEffort({files:9,lines:20}),"xhigh");
+  assert.equal(reviewEffort({files:1,lines:401}),"high");
+  assert.equal(reviewEffort({files:9,lines:20}),"high");
   assert.equal(reviewEffort({files:1,lines:8},["destructive operation"]),"high");
   assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6-luna",variant:"medium"},"high"),false);
   assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6-luna",variant:"xhigh"},"high"),true);
@@ -61,6 +61,7 @@ test("risk requires same-candidate checks and review; ordinary tasks do not", ()
   assert.ok(gateReason(c,{passedDigest:"a"},false));
   assert.equal(gateReason(c,{passedDigest:"a"},true),"");
   assert.equal(gateReason({digest:"a",reasons:[]},{},false),"");
+  assert.match(gateReason({digest:"a",reasons:[]},{lastCheckFailed:true},false),/previous standard check failed/);
 });
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(),"harness-quality-"));
@@ -96,7 +97,7 @@ test("large untracked source counts toward review effort and stays stable after 
   const {root,git}=await fixture(t);
   await writeFile(join(root,"lib/new_feature.dart"),"// generated fixture line\n".repeat(401));
   const before=await candidate(root,"app","");
-  assert.equal(before.effort,"xhigh");
+  assert.equal(before.effort,"high");
   assert.ok(before.reasons.includes("large change requires independent review"));
   git("add","."); git("commit","-qm","large change");
   const after=await candidate(root,"app","");
@@ -123,7 +124,7 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   assert.equal((await publish()).effect,"deny");
-  assert.match(await q.reason("main"),/Run the standard check/);
+  assert.match(await q.reason("main"),/standard check/);
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS product\nPASS analyze\nPASS flutter-tests"}});
   assert.match(await q.reason("main"),/reviewer verdict/);
@@ -144,4 +145,14 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   assert.equal((await publish()).effect,"ask");
   await writeFile(join(root,"lib/data/task_repository.dart"),"void deleteCompletedTasks() { throw StateError('bad'); }\n");
   assert.equal((await publish()).effect,"deny");
+});
+
+test("changing a behavior contract invalidates evidence without inflating source effort", async t => {
+  const {root}=await fixture(t);
+  await mkdir(join(root,"docs/product"),{recursive:true});
+  const before=await candidate(root,"app","");
+  await writeFile(join(root,"docs/product/tasks.md"),"Sort within groups.");
+  const after=await candidate(root,"app","");
+  assert.notEqual(after.digest,before.digest);
+  assert.deepEqual(after.size,before.size);
 });

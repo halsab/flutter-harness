@@ -80,7 +80,7 @@ done
 # V2 delivery guard resumes a normal agent session if implementation stops
 # without an open, up-to-date PR. Existing plugin files are never overwritten.
 mkdir -p "$TARGET/.opencode/plugins/delivery-guard"
-for name in index.js guard.mjs quality.mjs; do
+for name in index.js guard.mjs quality.mjs resources.mjs; do
   if [[ ! -e "$TARGET/.opencode/plugins/delivery-guard/$name" ]]; then
     cp "$ROOT/plugins/delivery-guard/$name" "$TARGET/.opencode/plugins/delivery-guard/$name"
     info "Installed delivery guard $name."

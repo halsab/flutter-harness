@@ -25,7 +25,7 @@ jobs:
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
       - name: Verify OpenCode delivery-guard logic (no model calls)
-        run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs
+        run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs scripts/test_resources.mjs
       - name: Check runner stops at formatting failure
         run: |
           set -euo pipefail
@@ -104,6 +104,7 @@ jobs:
             test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
             test -f "$tmp/.opencode/plugins/delivery-guard/guard.mjs"
             test -f "$tmp/.opencode/plugins/delivery-guard/quality.mjs"
+            test -f "$tmp/.opencode/plugins/delivery-guard/resources.mjs"
             test -f "$tmp/.flutter-harness/bin/verify-e2e.py"
             if [[ "$profile" == "mobile-web" ]]; then
               test -f "$tmp/.flutter-harness/bin/web-preview.py"
