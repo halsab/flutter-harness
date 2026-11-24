@@ -29,3 +29,5 @@ risk-based gate does.
 
 An independent reviewer is optional for isolated routine work, but use one focused pre-PR review for material cross-feature interactions (e.g. sorting+search+filter) and genuine high risks. It must check acceptance criteria and missing regression assertions, not aesthetics. Test/review overhead should not overwhelm
 implementation.
+
+Reviewer effort is adaptive: Luna Medium for <=100 lines and <=3 files, High for <=400 lines and <=8 files or risk flags, Extra High (xhigh) above either large-change threshold. Count source/test additions and deletions, not generated lockfiles. Large changes require independent review; isolated trivial changes still skip it. One reviewer per review stage; required review evidence must match the actual selected Luna variant and candidate. Tune thresholds from observed quality, time and token use.

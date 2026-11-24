@@ -12,4 +12,5 @@ The reusable Harness aims for quick, stable, high-quality autonomous Flutter del
 - Optional E2E not run is NOT RUN (not required), never a reason for mandatory Draft. Failed required checks and material unresolved issues keep Draft. Report actual checks honestly.
 - Keep main.dart focused on app bootstrap for growing apps; put screen and state transformations in a feature folder without introducing state-management packages gratuitously. Refactor existing monoliths separately rather than grow them indefinitely.
 - Persistent-data mutations, bulk deletion and tests removed after a failed run require actual standard-check and independent reviewer evidence on the same candidate before publication. Never delete a meaningful failing acceptance test to turn CI green. Fix formatting before a standard run.
+- Select reviewer Luna Medium/High/Extra High (xhigh) from actual diff size; risk-flagged changes use at least High and large changes require review. One reviewer, no repeated tier escalation. Verify actual child model/effort for required review.
 - CI stays lightweight; no hosted mobile/browser E2E added merely because local tools are unreliable.

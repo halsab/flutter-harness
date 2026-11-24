@@ -4,13 +4,26 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate } from "../plugins/delivery-guard/quality.mjs";
+import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel } from "../plugins/delivery-guard/quality.mjs";
 
 test("risk detection follows actual repository changes, not routine UI wording", () => {
   assert.ok(classify(["lib/data/task_repository.dart"], "routine UI change").length);
   assert.ok(classify(["lib/features/tasks/task_list_screen.dart"], "Добавь возможность удалить все завершённые задачи").length);
   assert.equal(classify(["lib/features/tasks/task_list_screen.dart"], "Измени подпись").length, 0);
   assert.ok(classify(["test/widget_test.dart"], "", ["test/widget_test.dart: preserves records"]).length);
+});
+test("review effort scales with diff size and risk, not the builder's choice", () => {
+  assert.equal(reviewEffort({files:1,lines:20}),"medium");
+  assert.equal(reviewEffort({files:3,lines:100}),"medium");
+  assert.equal(reviewEffort({files:3,lines:101}),"high");
+  assert.equal(reviewEffort({files:4,lines:20}),"high");
+  assert.equal(reviewEffort({files:8,lines:400}),"high");
+  assert.equal(reviewEffort({files:1,lines:401}),"xhigh");
+  assert.equal(reviewEffort({files:9,lines:20}),"xhigh");
+  assert.equal(reviewEffort({files:1,lines:8},["destructive operation"]),"high");
+  assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6-luna",variant:"medium"},"high"),false);
+  assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6-luna",variant:"xhigh"},"high"),true);
+  assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6.2-sol",variant:"xhigh"},"high"),false);
 });
 test("only delivery commands and standard checks match", () => {
   for (const c of ["git push -u origin feature/a", "gh pr create --base app", "gh pr ready 1", "git status && git push"]) assert.ok(publishing(c), c);
@@ -56,13 +69,27 @@ test("candidate is stable across commit, records removed failed-test name, and i
   git("add","."); git("commit","-qm","feature");
   const after=await candidate(root,"app","",failing.names);
   assert.equal(after.digest,before.digest);
+  assert.deepEqual(after.size,before.size);
+  assert.equal(after.effort,"high");
   await writeFile(path,"test('replacement', () {});\n");
   assert.notEqual((await candidate(root,"app","")).digest,after.digest);
 });
-test("mock V2 hooks deny risky push until real child PASS, then preserve ask; stale source blocks again", async t => {
+test("large untracked source counts toward review effort and stays stable after commit", async t => {
+  const {root,git}=await fixture(t);
+  await writeFile(join(root,"lib/new_feature.dart"),"// generated fixture line\n".repeat(401));
+  const before=await candidate(root,"app","");
+  assert.equal(before.effort,"xhigh");
+  assert.ok(before.reasons.includes("large change requires independent review"));
+  git("add","."); git("commit","-qm","large change");
+  const after=await candidate(root,"app","");
+  assert.equal(after.effort,"xhigh");
+  assert.equal(after.digest,before.digest);
+  assert.deepEqual(after.size,before.size);
+});
+test("mock V2 hooks deny risky push until real child PASS at required effort, then preserve ask; stale source blocks again", async t => {
   const {root}=await fixture(t);
   const values=new Map([["task/main",{active:true,request:"Удалить все завершённые задачи"}]]);
-  const hooks={}; let child={parentID:"main",agent:"reviewer",outcome:"running"};
+  const hooks={}; let child={parentID:"main",agent:"reviewer",outcome:"running",model:{providerID:"openai",id:"gpt-6-luna",variant:"medium"}};
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     tool:{hook:async(n,f)=>hooks[n]=f},
@@ -79,9 +106,12 @@ test("mock V2 hooks deny risky push until real child PASS, then preserve ask; st
   const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review diff"}};
   await hooks["execute.before"](review);
   assert.match(review.input.prompt,/VERDICT: PASS/);
+  assert.equal(review.input.model,"openai/gpt-6-luna#high");
   await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.equal((await publish()).effect,"deny");
   child={...child,outcome:"succeeded"};
+  assert.equal((await publish()).effect,"deny", "Medium cannot satisfy a High review");
+  child={...child,model:{...child.model,variant:"high"}};
   assert.equal(await q.reason("main"),"");
   assert.equal((await publish()).effect,"ask");
   await writeFile(join(root,"lib/data/task_repository.dart"),"void deleteCompletedTasks() { throw StateError('bad'); }\n");

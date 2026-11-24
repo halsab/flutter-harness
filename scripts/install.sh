@@ -120,6 +120,8 @@ folders with no gratuitous state-management dependency.
 One bounded independent read-only reviewer for cross-feature interactions,
 security, sensitive data, migration, concurrency, large architecture or
 explicit user request. Skip reviewer for trivial changes; no review loops.
+The plugin routes reviewer Luna Medium/High/Extra High (xhigh) from diff size
+and risk; large changes require review and persistent-data risk uses at least High.
 If required checks pass, push with approval and create a normal PR into app.
 If a genuinely required check fails or a material finding remains, use Draft.
 Never auto-merge or force-push. Respect denied tool actions and golden approvals.
