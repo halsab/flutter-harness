@@ -51,7 +51,7 @@ fi
 
 mkdir -p "$TARGET/.flutter-harness/templates/product"
 # Copy missing product policy, starter and tools; never overwrite project code.
-for name in check-product.py init-product.py; do
+for name in check-product.py init-product.py task-plan.py; do
   if [[ ! -e "$TARGET/.flutter-harness/bin/$name" ]]; then
     cp "$ROOT/scripts/$name" "$TARGET/.flutter-harness/bin/$name"
   fi
@@ -71,7 +71,7 @@ for name in PRODUCT.md product.json; do
 done
 
 touch "$TARGET/.gitignore"
-for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json' '/.flutter-harness/previews/'; do
+for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json' '/.flutter-harness/previews/' '/.flutter-harness/work/'; do
   if ! grep -Fxq "$ignored" "$TARGET/.gitignore"; then
     printf '%s\n' "$ignored" >> "$TARGET/.gitignore"
   fi
@@ -123,8 +123,11 @@ Adopt the foundation before application delivery; do not disable the check.
 User requests describe outcomes; implement with minimal technical approvals.
 Use a feature branch from app (Lab) or the documented integration branch.
 Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
-Default model: GPT-6 Luna medium, including planning and diagnosis.
-Do not automatically use Sol or another premium model.
+Default build: GPT-6 Luna Medium. Complex planning/diagnosis: Luna High.
+Simple delegated slices: Luna Low. Follow the orchestration guide for large
+changes; one parent owns verification and delivery. Optional Sol Medium
+advisor only for one compact consequential architectural decision per task;
+no premium implementation or automatic escalation.
 Format once with dart format lib test, then run one standard check.
 Never remove a failing acceptance test to make checks green. Risky persistent
 or destructive changes require a successful check and independent reviewer

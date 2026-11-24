@@ -166,9 +166,11 @@ postconditions prevent that class of false failure.
 ## Models, permissions and verification
 
 OpenCode V2 defaults to **GPT-6 Luna medium** for implementation and focused
-final review. Planning and focused diagnosis also default to Luna Medium.
-No automatic premium-model escalation; explicit user model selection remains
-possible. See the [model routing and safety guide](docs/model-routing.md).
+final review. Complex planning and focused diagnosis use Luna High; bounded
+worker slices use Luna Low. One Medium parent owns orchestration and delivery.
+Optional Sol Medium advisor handles one consequential compact architectural
+decision per task. No premium implementation or automatic escalation; explicit
+user model selection remains possible. See the [model routing and safety guide](docs/model-routing.md).
 Templates contain no credentials; authorize your provider locally.
 
 The templates ask before accessing paths outside the project, ask before Git

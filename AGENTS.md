@@ -3,7 +3,7 @@
 The reusable Harness aims for quick, stable, high-quality autonomous Flutter delivery.
 
 - One short feature request -> implementation -> minimal verification -> PR; no redundant technical approvals, worktree choice or repeated planning.
-- Default GPT-6 Luna medium for build; per-session UI variant may override config. Plan and diagnose with Luna Medium; no automatic Sol or premium-model escalation.
+- Default GPT-6 Luna medium for build; per-session UI variant may override config. Plan complex work and diagnose hard failures with Luna High, delegate small stable-contract slices to Luna Low; optional Sol Medium advisor once per original task for a consequential compact architectural decision; no premium implementation or automatic escalation. Follow templates/product/ORCHESTRATION.md for large tasks; one parent owns delivery.
 - Keep local changes safe; stage only task files, never auto-merge, force-push, publish or bypass permission denials. Never claim a feature delivered unless verify-pr.sh confirms its open PR contains the local HEAD.
 - Material new/changed product behavior: establish a compact behavior contract using templates/product/BEHAVIOR.md before code or design; check interacting states, preserved behavior, failures and acceptance examples. No new document for trivial work.
 - Default code gate: one check.sh standard (format, analyzer, fast unit/widget tests). Add focused Dart unit tests for business rules and persistence; widget tests only for meaningful stateful UI behavior. No tests for trivial labels/boilerplate or arbitrary coverage targets.
