@@ -59,7 +59,7 @@ done
 # V2 delivery guard resumes a normal agent session if implementation stops
 # without an open, up-to-date PR. Existing plugin files are never overwritten.
 mkdir -p "$TARGET/.opencode/plugins/delivery-guard"
-for name in index.js guard.mjs; do
+for name in index.js guard.mjs quality.mjs; do
   if [[ ! -e "$TARGET/.opencode/plugins/delivery-guard/$name" ]]; then
     cp "$ROOT/plugins/delivery-guard/$name" "$TARGET/.opencode/plugins/delivery-guard/$name"
     info "Installed delivery guard $name."
@@ -100,7 +100,10 @@ User requests describe outcomes; implement with minimal technical approvals.
 Use a feature branch from app (Lab) or the documented integration branch.
 Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
 Default model: GPT-6 Luna medium. Sol/extra agents only for difficult work.
-Run one standard check (format, analyze, fast Dart unit/widget tests).
+Format once with dart format lib test, then run one standard check.
+Never remove a failing acceptance test to make checks green. Risky persistent
+or destructive changes require a successful check and independent reviewer
+verdict on the exact candidate before publication.
 Write focused unit tests for important logic and widget tests only for stateful
 UI behavior. No tests for boilerplate, trivial styling or coverage quotas.
 Android/iOS/Web device/browser E2E are NOT required for ordinary features.
