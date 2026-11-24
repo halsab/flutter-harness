@@ -41,3 +41,35 @@ legacy screenshot using prepare-judge.sh and JUDGE-RUN.md. Then pilot
 the owner-preferred task design in Flutter, retaining existing data and
 functionality. Separate design quality, implementation fidelity and
 engineering acceptance; no new production delivery guard until tested.
+
+## Independent evaluator trial
+
+One fresh Sol Medium session reported 1m 44s wall time, all 11 PNGs
+inspected, and no blocker. The two user-supplied reports record an image-only
+assessment before the interaction-map audit. The author mapping was concealed
+within the judge workspace: tasks X = Luna, Y = Sol; finance X = Sol, Y = Luna.
+
+| Brief | Luna 1 | Luna 2 | Sol 1 | Sol 2 | Recommended |
+| --- | --- | --- | --- | --- | --- |
+| Tasks | acceptable | acceptable | acceptable | acceptable | Sol 1 |
+| Finance | changes required | changes required | acceptable | acceptable | Sol 1 |
+
+The evaluator preferred the content-first teaching example while identifying
+its redundant subtitles and the weaker example's useful affordances. It
+identified the legacy task screen's hierarchy and scope problems (no
+separate absolute legacy verdict was recorded). It rejected both Luna
+finance concepts for invented data and interaction/discoverability defects;
+reading the handoffs did not overturn those verdicts. The task winner
+matches the owner's preference, with the owner's search behavior amendment
+still to be implemented. The audit identifies real ambiguities involving
+default ordering, duplicate placement, destructive actions, and accessibility.
+
+This is promising initial evidence, not validation of the evaluator across
+products. The same model family judged its own anonymous outputs, only one
+judge run was performed, no score threshold is calibrated, and neither
+functionality nor implementation fidelity was established. No gate should
+treat an ordinal score or ACCEPTABLE_CONCEPT as implementation acceptance.
+
+Next experiment: FIDELITY-PILOT.md. Pilot Luna implementation of the selected
+Sol task concept on a fresh branch from current lab app. Keep PR #25 as the
+negative control, do not merge it or use its code as a starting point.
