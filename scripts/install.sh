@@ -49,8 +49,29 @@ if [[ ! -e "$TARGET/.flutter-harness/bin/verify-e2e.py" ]]; then
   info "Installed platform E2E completeness gate."
 fi
 
+mkdir -p "$TARGET/.flutter-harness/templates/product"
+# Copy missing product policy, starter and tools; never overwrite project code.
+for name in check-product.py init-product.py; do
+  if [[ ! -e "$TARGET/.flutter-harness/bin/$name" ]]; then
+    cp "$ROOT/scripts/$name" "$TARGET/.flutter-harness/bin/$name"
+  fi
+done
+while IFS= read -r -d '' file; do
+  relative="${file#"$ROOT/templates/product/"}"
+  destination="$TARGET/.flutter-harness/templates/product/$relative"
+  if [[ ! -e "$destination" ]]; then
+    mkdir -p "$(dirname "$destination")"
+    cp "$file" "$destination"
+  fi
+done < <(find "$ROOT/templates/product" -type f -print0)
+for name in PRODUCT.md product.json; do
+  if [[ ! -e "$TARGET/.flutter-harness/$name" ]]; then
+    cp "$ROOT/templates/product/$name" "$TARGET/.flutter-harness/$name"
+  fi
+done
+
 touch "$TARGET/.gitignore"
-for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json'; do
+for ignored in '/.playwright-mcp/' '/.flutter-harness/verification.json' '/.flutter-harness/previews/'; do
   if ! grep -Fxq "$ignored" "$TARGET/.gitignore"; then
     printf '%s\n' "$ignored" >> "$TARGET/.gitignore"
   fi
@@ -95,6 +116,9 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Project tooling: https://github.com/halsab/flutter-harness
 Read .flutter-harness/config.json and load the flutter-harness skill.
+Read .flutter-harness/PRODUCT.md for the mandatory feature-first MVVM, UX,
+UI profile and design-system baseline. Default Adaptive, Flutter Web only.
+Adopt the foundation before application delivery; do not disable the check.
 
 User requests describe outcomes; implement with minimal technical approvals.
 Use a feature branch from app (Lab) or the documented integration branch.

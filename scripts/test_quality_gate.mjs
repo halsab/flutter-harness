@@ -12,6 +12,11 @@ test("risk detection follows actual repository changes, not routine UI wording",
   assert.equal(classify(["lib/features/tasks/task_list_screen.dart"], "Измени подпись").length, 0);
   assert.ok(classify(["test/widget_test.dart"], "", ["test/widget_test.dart: preserves records"]).length);
 });
+test("shared product UI and explicit redesign require review even at small sizes", () => {
+  assert.ok(classify(["lib/design_system/theme.dart"],"change palette").length);
+  assert.ok(classify(["lib/features/tasks/screens/tasks.dart"],"редизайн UI/UX").length);
+  assert.equal(classify(["lib/features/tasks/screens/tasks.dart"],"fix typo").length,0);
+});
 test("review effort scales with diff size and risk, not the builder's choice", () => {
   assert.equal(reviewEffort({files:1,lines:20}),"medium");
   assert.equal(reviewEffort({files:3,lines:100}),"medium");
@@ -112,10 +117,16 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
   const publish=async()=>{const e={sessionID:"main",action:"shell",resources:["git push -u origin feature/bulk"],effect:"ask"};await hooks.evaluate(e);return e;};
   assert.equal((await publish()).effect,"deny");
+  await mkdir(join(root,".flutter-harness"),{recursive:true});
+  await writeFile(join(root,".flutter-harness/product.json"),JSON.stringify({status:"active"}));
   const check={tool:"shell",sessionID:"main",id:"check",input:{command:"bash .flutter-harness/bin/check.sh ."}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   assert.equal((await publish()).effect,"deny");
+  assert.match(await q.reason("main"),/Run the standard check/);
+  await hooks["execute.before"](check);
+  await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS product\nPASS analyze\nPASS flutter-tests"}});
+  assert.match(await q.reason("main"),/reviewer verdict/);
   const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review diff"}};
   await hooks["execute.before"](review);
   assert.match(review.input.prompt,/VERDICT: PASS/);

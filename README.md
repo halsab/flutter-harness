@@ -18,6 +18,20 @@ a fresh runtime trial is still required to validate these corrections.
 
 Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 
+## Product foundation
+
+One default feature-first MVVM architecture and Adaptive UI profile (Material
+on Android and Flutter Web, Cupertino on native iOS). Universal Material is
+supported by the same starter. Minimal and Custom are optional extension
+profiles, not shipped component kits. Read [the product standard](templates/product/PRODUCT.md).
+Installation adds the policy, product.json (pending adoption), non-destructive
+design-system starter and executable architecture/style-import convention check.
+The agent adopts the baseline and activates it in the first product PR;
+existing app code is not overwritten. The first Lab migration will validate
+the actual product workflow. The starter is smoke-tested in CI against
+Flutter; actual visual review is required for significant UI changes,
+not routine functional tasks.
+
 ## Repositories
 
 - Harness: https://github.com/halsab/flutter-harness
