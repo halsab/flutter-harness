@@ -142,10 +142,15 @@ a justified exception is required.
 
 ## Efficient delivery
 
+For broad or genuinely interacting changes use the installed ORCHESTRATION.md
+guide. One High-effort Luna architect plans across product and implementation
+boundaries; the Medium parent executes or delegates small stable-contract slices
+to Low-effort workers. Do not require a planner or worker for simple changes.
+
 Identify meaningful failure scenarios before editing. For failed targeted
 tests, fix the specific cause rather than rerun the whole suite; after two
 unsuccessful attempts at the same substantive failure, isolate the failing
-case and, if useful, consult the Luna Medium architect once for focused
+case and, if useful, consult the Luna High architect once for focused
 diagnosis. Apply the recommendation and check the affected behavior.
 Ordinary format failures do not need escalation. Failed checks are work to
 fix, not an external blocker. If bounded recovery fails, report INCOMPLETE.

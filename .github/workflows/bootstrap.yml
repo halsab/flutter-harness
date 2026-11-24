@@ -91,6 +91,9 @@ jobs:
             test -f "$tmp/.flutter-harness/bin/maestro.sh"
             test -f "$tmp/.flutter-harness/bin/check.sh"
             test -f "$tmp/.flutter-harness/bin/check-product.py"
+            test -f "$tmp/.flutter-harness/bin/task-plan.py"
+            test -f "$tmp/.flutter-harness/templates/product/ORCHESTRATION.md"
+            test "$(grep -Fxc '/.flutter-harness/work/' "$tmp/.gitignore")" -eq 1
             test -f "$tmp/.flutter-harness/bin/init-product.py"
             test -f "$tmp/.flutter-harness/PRODUCT.md"
             test -f "$tmp/.flutter-harness/templates/product/BEHAVIOR.md"

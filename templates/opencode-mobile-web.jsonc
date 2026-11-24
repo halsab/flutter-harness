@@ -7,12 +7,12 @@
       "model": "openai/gpt-6-luna#medium"
     },
     "plan": {
-      "model": "openai/gpt-6-luna#medium"
+      "model": "openai/gpt-6-luna#high"
     },
     "architect": {
-      "description": "Consult ONLY for genuinely complex architecture or hard diagnosis. Answer one focused question concisely, then return to the Luna implementer. Read-only.",
+      "description": "Read-only Luna High. For complex changes analyze product behavior, actual dependency/call graph, contracts, affected consumers, data/state risks, and produce independently verifiable slices with explicit dependencies and file ownership. Or diagnose one hard failure. Return a concise actionable plan; do not implement, publish or spawn children.",
       "mode": "subagent",
-      "model": "openai/gpt-6-luna#medium",
+      "model": "openai/gpt-6-luna#high",
       "permissions": [
         {
           "action": "edit",
@@ -48,6 +48,16 @@
           "action": "shell",
           "resource": "git log *",
           "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "question",
+          "resource": "*",
+          "effect": "deny"
         }
       ]
     },
@@ -107,6 +117,83 @@
     },
     "summary": {
       "model": "openai/gpt-6-luna#low"
+    },
+    "worker": {
+      "description": "Implement ONE small, well-specified source/test slice with stable contracts. Edit only the assigned exact files, return a concise result and suggested targeted check. No shell/builds, Git publication, contract changes, additional agents or user questions; report conflicts to parent. Parent runs checks and integrates.",
+      "mode": "subagent",
+      "model": "openai/gpt-6-luna#low",
+      "permissions": [
+        {
+          "action": "shell",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "question",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "browser",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "dart_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "maestro_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "playwright_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "chrome-devtools_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "xcode_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "xcodebuild_*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "generate_image",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "webfetch",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "websearch",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     }
   },
   "providers": {

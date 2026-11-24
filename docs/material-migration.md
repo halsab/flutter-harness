@@ -13,6 +13,7 @@ Harness-owned baseline files below, merging intentional project overrides:
 - templates/product/PRODUCT.md -> .flutter-harness/PRODUCT.md
 - templates/product/* -> .flutter-harness/templates/product/ (starter files)
 - scripts/check-product.py -> .flutter-harness/bin/check-product.py
+- scripts/task-plan.py -> .flutter-harness/bin/task-plan.py; add /.flutter-harness/work/ to .gitignore.
 - skills/flutter-harness/SKILL.md -> .opencode/skills/flutter-harness/SKILL.md
 - templates/opencode-<profile>.jsonc -> corresponding local OpenCode config;
   merge model routes and retain authentication, permissions and other user
