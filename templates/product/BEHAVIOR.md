@@ -74,16 +74,17 @@ completion and append order. No new timestamp or schema migration.
 - Failed writes retain saved state; keep draft input and retry. Bulk deletion
   has explicit scope and confirmation; sorting cannot affect deletion scope.
 
-Seed in stored order: B(active), D(completed), A(active), C(completed).
+Seed in stored order: B(active), E(completed), A(active), F(completed),
+C(active), D(completed). Neither group's stored order is alphabetical.
 
 | Action / starting state | Expected result | Evidence |
 | --- | --- | --- |
-| All, By addition | Active B,A; Completed D,C; count 2 | Unit + widget |
-| Select Title A–Z | Active A,B; Completed C,D | Unit |
-| Select Title Z–A | Active B,A; Completed D,C | Unit |
-| A–Z: select Completed, then All | C,D only; then A,B / C,D; order retained | Unit/widget |
-| All, A–Z: query C, then clear | Completed C only; then A,B / C,D; count 2 | Unit/widget |
-| A–Z: complete A | Active B; Completed A,C,D; count 1 | Unit + persistence evidence |
+| All, By addition | Active B,A,C; Completed E,F,D; count 3 | Unit + widget |
+| Select Title A–Z | Active A,B,C; Completed D,E,F | Unit |
+| Select Title Z–A | Active C,B,A; Completed F,E,D | Unit |
+| A–Z: select Completed, then All | D,E,F only; then A,B,C / D,E,F; order retained | Unit/widget |
+| All, A–Z: query D, then clear | Completed D only; then A,B,C / D,E,F; count 3 | Unit/widget |
+| A–Z: complete A | Active B,C; Completed A,D,E,F; count 2 | Unit + persistence evidence |
 | Equal titles, distinct IDs | Both remain; ties keep stored order both directions | Unit |
 | Reject completion write and reload | Original IDs, statuses and stored order unchanged | Repository/VM |
 | Change sort under query/filter | Selected criterion visible, grouping and matching remain | Widget |
