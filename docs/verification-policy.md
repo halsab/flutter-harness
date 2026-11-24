@@ -27,7 +27,7 @@ device-input failures; then report the optional test blocked rather than
 looping. An optional unrun E2E does not block a routine PR; a failed REQUIRED
 risk-based gate does.
 
-For product projects the standard runner also checks architecture and design-system conventions. Substantial new screens/redesigns require real visual inspection and the same independent reviewer, not an additional design agent or functional E2E suite. See templates/product/PRODUCT.md. Anticipate rejected writes before first review; use targeted checks during iteration, and run required reviewer and final check concurrently only when source is stable.
+For product projects the standard runner also checks architecture and design-system conventions. Substantial new screens/redesigns require real visual inspection and the same independent reviewer, not an additional design agent or functional E2E suite. See templates/product/PRODUCT.md and DESIGN.md: choose the visual direction before code, then inspect actual implementation against it and the behavior contract. Anticipate rejected writes before first review; use targeted checks during iteration, and run required reviewer and final check concurrently only when source is stable.
 
 An independent reviewer is optional for isolated routine work, but use one focused pre-PR review for material cross-feature interactions (e.g. sorting+search+filter) and genuine high risks. It must check acceptance criteria, missing regression assertions and material product/UX defects, not arbitrary cosmetic preferences. Test/review overhead should not overwhelm
 implementation.

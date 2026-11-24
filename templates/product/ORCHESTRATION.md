@@ -22,7 +22,7 @@ arbitrary line count or one agent per file. Include expected input/output,
 preserved behavior, dependencies, exact reads/writes, and observable
 acceptance. Keep migrations, schema/API changes and shared foundations
 sequential; settle interface contracts before dispatching consumers.
-For a significant visual change establish the intended design before
+For a significant visual change use DESIGN.md to establish the intended design before
 delegating its implementation. A slice must be small enough for a worker
 to understand and check without rereading the entire project.
 

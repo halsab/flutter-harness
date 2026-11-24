@@ -97,6 +97,15 @@ Use the Material package compatible with the pinned SDK and existing project.
 No new UI library dependency merely for styling. Preserve keyboard/focus,
 safe areas, responsive layout, semantics, and large-text support.
 
+## Visual design before implementation
+
+For a substantial new screen, flow or redesign follow the compact DESIGN.md
+guide in .flutter-harness/templates/product/. Define the behavior first;
+choose a visual direction using relevant actual reference images and Material
+patterns before delegating or coding UI. Keep the selected direction and
+interaction notes in the task handoff. No mandatory mockup for ordinary UI
+changes, no separate design-review agent, no premium model for visual design.
+
 ## Visual acceptance and review
 
 For a material new screen, redesign, major navigation/flow or design-system
@@ -111,7 +120,8 @@ Use actual local simulator/browser captures, not mockups or Ahem widget-test
 screenshots as proof of polished visual design. Save local previews under
 .flutter-harness/previews/ (ignored); include exact paths/viewport/platform
 in reviewer handoff and PR, attach screenshots when supported.
-Review hierarchy, spacing, discoverability, clipping, theme, states,
+Compare the actual rendered result with the selected direction, original
+request and behavior contract. Review hierarchy, spacing, discoverability, clipping, theme, states,
 platform behavior and reuse. Material hierarchy or interaction defects are
 not cosmetic preferences. One read-only reviewer covers correctness,
 architecture and UX, not three separate agents. If runtime visual review is
