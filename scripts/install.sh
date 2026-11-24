@@ -109,9 +109,14 @@ actually demands it, or the user explicitly requests E2E.
 Do not infer a failed save from an item hidden by a selected filter.
 If optional E2E is not needed, report NOT RUN (not required), not BLOCKED.
 The legacy verify-e2e.py helper is optional, not a delivery gate.
-Default self-review the full task diff once; independent read-only reviewer
-only for security, sensitive data, migration, complex concurrency, large
-architecture or explicit user request. No repeated reviewer loops.
+Preflight one task-diff review BEFORE final checks. Match important new
+observable behavior to a focused unit/widget test; green old tests are not
+evidence for untested sorting/filter interactions. Avoid redundant tests.
+Keep main.dart as entrypoint; put growing feature UI/view state in feature
+folders with no gratuitous state-management dependency.
+One bounded independent read-only reviewer for cross-feature interactions,
+security, sensitive data, migration, concurrency, large architecture or
+explicit user request. Skip reviewer for trivial changes; no review loops.
 If required checks pass, push with approval and create a normal PR into app.
 If a genuinely required check fails or a material finding remains, use Draft.
 Never auto-merge or force-push. Respect denied tool actions and golden approvals.
