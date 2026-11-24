@@ -1,6 +1,6 @@
 # Verification policy: speed with quality
 
-Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior.
+Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior. For material changes, derive acceptance evidence from the product behavior contract and original request before implementation; correct contradictory product rules, not just the code. See [the behavior guide](../templates/product/BEHAVIOR.md).
 
 Add tests only for important public behavior:
 - Dart unit tests for validation, calculations, business decisions, persistence,

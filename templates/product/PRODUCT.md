@@ -34,6 +34,18 @@ choice; document genuine architectural exceptions rather than bypass checks.
 - Independent features must not import each other's internals. Compose them
   in app, or extract a shared contract/model to core if warranted.
 
+## Product behavior before visual design
+
+For material new/changed behavior use the behavior contract guide
+(BEHAVIOR.md in the reusable product template, installed at
+.flutter-harness/templates/product/BEHAVIOR.md). Resolve intent, state,
+combinations with existing features, failure paths and observable acceptance
+examples before code or visual concepts. Update one existing feature spec or
+docs/product/<feature>.md when warranted; no new document for trivial work.
+Independent controls remain independent unless the user job justifies an
+explicit dependency. Check the rules against the original request, not just
+implementation/test agreement. No extra approval or premium model by default.
+
 ## UX — design the flow, not a pile of controls
 
 For a new screen or meaningful UX change, privately identify primary user
