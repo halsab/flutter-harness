@@ -80,7 +80,7 @@ done
 # V2 delivery guard resumes a normal agent session if implementation stops
 # without an open, up-to-date PR. Existing plugin files are never overwritten.
 mkdir -p "$TARGET/.opencode/plugins/delivery-guard"
-for name in index.js guard.mjs quality.mjs; do
+for name in index.js guard.mjs quality.mjs resources.mjs; do
   if [[ ! -e "$TARGET/.opencode/plugins/delivery-guard/$name" ]]; then
     cp "$ROOT/plugins/delivery-guard/$name" "$TARGET/.opencode/plugins/delivery-guard/$name"
     info "Installed delivery guard $name."
@@ -148,8 +148,9 @@ folders with no gratuitous state-management dependency.
 One bounded independent read-only reviewer for cross-feature interactions,
 security, sensitive data, migration, concurrency, large architecture or
 explicit user request. Skip reviewer for trivial changes; no review loops.
-The plugin routes reviewer Luna Medium/High/Extra High (xhigh) from diff size
-and risk; large changes require review and persistent-data risk uses at least High.
+The plugin routes reviewer Luna Medium/High from diff size and risk; large
+changes still require review. No automatic xhigh. One advisor and at most two
+review attempts per tracked root task; phase-aware recovery stops on no progress.
 If required checks pass, push with approval and create a normal PR into app.
 If a genuinely required check fails or a material finding remains, use Draft.
 Never auto-merge or force-push. Respect denied tool actions and golden approvals.

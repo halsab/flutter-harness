@@ -93,8 +93,11 @@ Optional E2E NOT RUN is not a blocker. Failed required high-risk checks
 or unresolved material review findings require Draft PRs.
 
 Keep MCP discovery bounded, skip whole-project searches for small changes,
-and avoid repeated full-codebase reviews. Usage limits are preferences, not
-hard enforced model caps. Inspect real session exports to measure overhead.
+and avoid repeated full-codebase reviews. The delivery plugin reserves at most one advisor and two reviewer tool
+attempts per tracked root task, with phase-aware idle recovery and early
+stop on no progress. Input/output token targets remain preferences, not
+hard enforced subscription caps. A new root session is not automatically
+linked to the previous budget. Inspect real session exports to measure overhead.
 See docs/verification-policy.md for the risk matrix.
 
 ## GitHub and authorization

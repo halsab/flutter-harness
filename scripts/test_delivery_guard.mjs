@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { taskIntent, changed, decide } from "../plugins/delivery-guard/guard.mjs";
+import { taskIntent, changed, decide, recovery } from "../plugins/delivery-guard/guard.mjs";
 const base = { head: "abc", branch: "app", status: "" };
 test("detects feature intent without treating a question as work", () => {
   assert.equal(taskIntent("Добавь счётчик задач"), true);
@@ -50,4 +50,22 @@ test("existing PR does not hide uncommitted work", () => {
 });
 test("feature branch change counts as activity", () => {
   assert.equal(changed(base, { ...base, branch: "feature/new" }), true);
+});
+
+test("recovery repairs checks before publication and stops without progress", () => {
+  const result={current:base,reasons:["PR missing"]};
+  const evidence={phase:"check",issue:"check failed",check:"failed",digest:"a"};
+  const first=recovery({attempts:0},result,evidence);
+  assert.equal(first.stop,false);
+  assert.match(first.prompt,/earliest failed/);
+  assert.equal(recovery({attempts:1,lastRecovery:first.fingerprint},result,evidence).stop,true);
+  const changed={...evidence,digest:"b"};
+  assert.equal(recovery({attempts:1,lastRecovery:first.fingerprint},result,changed).stop,false);
+  assert.equal(recovery({attempts:2},result,changed).stop,true);
+});
+test("review or delivery recovery reuses existing successful checks", () => {
+  const result={current:base,reasons:["PR missing"]};
+  const q={phase:"review",issue:"review missing",check:"passed",digest:"a"};
+  assert.match(recovery({attempts:0},result,q).prompt,/Reuse the successful standard evidence/);
+  assert.match(recovery({attempts:0},result,{...q,phase:"work",issue:""}).prompt,/do not repeat builds/);
 });

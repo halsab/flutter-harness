@@ -158,7 +158,10 @@ The only standing premium-model exception is one focused Sol Medium advisor
 consultation per original task under ORCHESTRATION.md. No premium build,
 whole-project planning/review or automatic failure-based escalation. Other
 premium use requires explicit user permission.
-Use one final standard check after implementation/review corrections. If
+Use one final standard check after implementation/review corrections.
+Reuse observed successful checks and review on unchanged source/tests/spec;
+no duplicate full runs solely because the session resumed. Follow the
+resource-aware recovery policy in ORCHESTRATION.md. If
 independent review is required, it may run concurrently with deterministic
 checks on the unchanged candidate. Wait for review result without duplicate
 review requests or unrelated edits. Fix material findings, run affected

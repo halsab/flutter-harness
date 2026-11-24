@@ -195,8 +195,8 @@ The **delivery guard** plugin is automatically installed under
 initial Git state. When OpenCode would normally finish, the experimental V2
 `session.hook("experimental.idle")` runs a **read-only** Git/PR check.
 If the task stopped at tests or a local edit without a verified PR, the
-plugin inserts a continuation into the same session (at most twice).
-After two unsuccessful continuations it fails the execution rather than
+plugin inserts a phase-aware continuation into the same session (at most twice).
+If evidence does not progress or the recovery budget is exhausted, it fails the execution rather than
 silently claiming delivery.
 
 The guard **never** pushes, commits, changes files or bypasses push approval.
