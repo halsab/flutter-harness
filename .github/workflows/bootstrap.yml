@@ -93,6 +93,7 @@ jobs:
             test -f "$tmp/.flutter-harness/bin/check-product.py"
             test -f "$tmp/.flutter-harness/bin/init-product.py"
             test -f "$tmp/.flutter-harness/PRODUCT.md"
+            test -f "$tmp/.flutter-harness/templates/product/BEHAVIOR.md"
             test -f "$tmp/.flutter-harness/product.json"
             python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["ui_profile"] == "universal"' "$tmp/.flutter-harness/product.json"
             test -f "$tmp/.flutter-harness/templates/product/lib/design_system/design_system.dart.template"
