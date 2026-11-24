@@ -7,12 +7,12 @@
       "model": "openai/gpt-6-luna#medium"
     },
     "plan": {
-      "model": "openai/gpt-6.2-sol#medium"
+      "model": "openai/gpt-6-luna#medium"
     },
     "architect": {
       "description": "Consult ONLY for genuinely complex architecture or hard diagnosis. Answer one focused question concisely, then return to the Luna implementer. Read-only.",
       "mode": "subagent",
-      "model": "openai/gpt-6.2-sol#medium",
+      "model": "openai/gpt-6-luna#medium",
       "permissions": [
         {
           "action": "edit",
@@ -112,11 +112,6 @@
   "providers": {
     "openai": {
       "models": {
-        "gpt-6.2-sol": {
-          "settings": {
-            "reasoningEffort": "medium"
-          }
-        },
         "gpt-6-luna": {
           "settings": {
             "reasoningEffort": "medium"
@@ -141,7 +136,11 @@
       },
       "maestro": {
         "type": "local",
-        "command": ["bash", ".flutter-harness/bin/maestro.sh", "mcp"],
+        "command": [
+          "bash",
+          ".flutter-harness/bin/maestro.sh",
+          "mcp"
+        ],
         "cwd": "."
       }
     }

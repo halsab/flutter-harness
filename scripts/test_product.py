@@ -35,8 +35,8 @@ class ProductTests(unittest.TestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
-    def config(self, status):
-        self.write(".flutter-harness/product.json", json.dumps(dict(schema=1, architecture="feature-mvvm", ui_profile="adaptive", status=status)))
+    def config(self, status, profile="universal"):
+        self.write(".flutter-harness/product.json", json.dumps(dict(schema=1, architecture="feature-mvvm", ui_profile=profile, status=status)))
 
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
@@ -50,8 +50,33 @@ class ProductTests(unittest.TestCase):
         self.write("lib/features/tasks/widgets/other.dart", "import 'package:demo/features/other/models/model.dart';")
         self.write("lib/main.dart", "class MyApp {}")
         errors = "\n".join(guard.verify(self.root))
-        for expected in ["main must only call", "invalid feature/layer dependency", "platform UI library", "storage/network directly", "fixed palette", "non-view layer must not import UI"]:
+        for expected in ["main must only call", "invalid feature/layer dependency", "storage/network directly", "fixed palette", "non-view layer must not import UI"]:
             self.assertIn(expected, errors)
+
+    def test_material_direct_in_view_not_domain(self):
+        self.write("lib/features/tasks/screens/material.dart", "import 'package:material_ui/material_ui.dart';")
+        self.write("lib/app/material.dart", "import 'package:flutter/material.dart';")
+        self.assertEqual(guard.verify(self.root), [])
+        self.write("lib/features/tasks/models/bad.dart", "import 'package:material_ui/material_ui.dart';")
+        self.assertIn("non-view layer must not import UI", "\n".join(guard.verify(self.root)))
+
+    def test_universal_rejects_alternate_ui_even_in_design_system(self):
+        self.write("lib/design_system/alternate.dart", "import 'package:cupertino_ui/cupertino_ui.dart';")
+        self.assertIn("universal uses Material only", "\n".join(guard.verify(self.root)))
+        self.config("active", "adaptive")
+        self.assertEqual(guard.verify(self.root), [])
+
+    def test_legacy_boundary_unchanged(self):
+        self.config("active", "adaptive")
+        self.write("lib/features/tasks/screens/direct.dart", "import 'package:material_ui/material_ui.dart';")
+        self.assertIn("platform UI library", "\n".join(guard.verify(self.root)))
+
+    def test_material_starter_defaults(self):
+        template = Path(__file__).resolve().parents[1] / "templates/product"
+        self.assertEqual(json.loads((template / "product.json").read_text())["ui_profile"], "universal")
+        for file in template.rglob("*.dart.template"):
+            self.assertNotIn("cupertino_ui", file.read_text())
+            self.assertNotIn("usesCupertino", file.read_text())
 
     def test_comment_and_string_do_not_create_style_violations(self):
         self.write("lib/features/tasks/widgets/comment.dart", "// Colors.red\nfinal text = 'Color(0xFF000000)';\nfinal padding = EdgeInsets.all(AppTokens.space8);")

@@ -11,15 +11,16 @@ The user describes the desired result. Handle implementation, appropriate checks
 
 Read .flutter-harness/PRODUCT.md and product.json before the first product
 change or meaningful screen/architecture change. Follow one feature-first
-MVVM baseline, default Adaptive Material/Cupertino, Flutter Web, reusable
+MVVM baseline, default universal Material 3, Flutter Web, reusable
 design-system tokens and components. If status is pending, adopt the starter
 with init-product.py and activate after real migration; never disable the
-guard. Use neutral Flutter widgets and centralized platform controls. Inspect
-actual rendered screens for material UX changes, including both visual
-variants during Adaptive adoption; no AI-driven functional E2E ritual.
-Include UX and architecture in the same bounded reviewer. Consult Sol once
-for genuine architectural complexity or two unsuccessful fixes to the same
-substantive failure. Anticipate meaningful rejected-write/reload scenarios
+guard. Use stock Material widgets directly in presentation and shared themes/tokens.
+Separate foundation adoption in an existing app from a broad redesign.
+Inspect actual rendered screens for material UX changes on representative
+platforms/states as specified in PRODUCT.md; no AI-driven functional E2E ritual.
+Include UX and architecture in the same bounded reviewer. If useful, consult
+Luna Medium architect once for genuine complexity or two unsuccessful fixes
+to the same substantive failure. No automatic use of Sol or premium models. Anticipate meaningful rejected-write/reload scenarios
 before coding; prefer targeted checks during iteration. Required review may
 run concurrently with standard checks on an unchanged candidate. Do not
 spawn parallel duplicate reviews. Preserve existing behavior and user data.
@@ -30,7 +31,7 @@ spawn parallel duplicate reviews. Preserve existing behavior and user data.
 2. Implement a minimal maintainable change. Internally name the observable outcomes and meaningful failure cases before editing (no separate planning document or user approval). For each new business rule or stateful interaction, choose the smallest test that would fail if that behavior were wrong. Reuse an existing test if it already exercises the new outcome. Static text, styling and trivial framework wiring need no new test. Do not add tests just to meet a count.
 3. **Preflight review BEFORE the standard check and PR:** inspect the complete task diff once against the integration base. Compare each changed observable behavior to an assertion in an existing/new unit or widget test; if none covers the important new branch, add one focused test now. In particular, new sorting requires checking both directions and original order, and combined search/filter/sort changes require checking their interaction without mutating persisted data. Also inspect whether the change is being appended to an unrelated oversized entrypoint/widget file. Fix material issues before continuing; do not invent tests for minor visual details.
    Format touched Dart files (dart format lib test) before running ONE bash .flutter-harness/bin/check.sh . standard PROFILE (format, analyzer, all fast Dart unit/widget tests). During implementation run targeted tests only when useful. If checks fail, correct the specific cause and rerun the affected check(s), followed by one confirmation. A green existing suite alone is not proof that a newly implemented behavior was tested. Do not run full builds or launch emulators/browsers by default.
-4. After implementation and targeted checks, do not repeat the full diff review. Required independent review may overlap final standard checks on an unchanged candidate; after material fixes both must cover the resulting candidate. If the change combines multiple existing behaviors (e.g. sorting plus filtering and search) or affects security/auth, sensitive data, persistent-data mutations, destructive operations (including bulk delete), migrations, payments/privacy, complex concurrency or wide architecture, material new screens/redesigns or shared design-system changes, use ONE **bounded, fresh-context read-only reviewer** before PR. Ask only: does the new behavior meet requirements, are any important cases untested, is persistent state preserved, and are there material architecture/regression risks? Supply the whole task diff and relevant tests; reject cosmetic findings. For trivial labels, ordinary isolated UI and style changes, the implementer's preflight review is enough. If a material finding requires a fix, run its targeted test and (if needed) the standard check again; at most one focused recheck, no review loops.
+4. After implementation and targeted checks, do not repeat the full diff review. Required independent review may overlap final standard checks on an unchanged candidate; after material fixes both must cover the resulting candidate. If the change combines multiple existing behaviors (e.g. sorting plus filtering and search) or affects security/auth, sensitive data, persistent-data mutations, destructive operations (including bulk delete), migrations, payments/privacy, complex concurrency or wide architecture, material new screens/redesigns or shared design-system changes, use ONE **bounded, fresh-context read-only reviewer** before PR. Ask only: does the new behavior meet requirements, are any important cases untested, is persistent state preserved, and are there material architecture/regression risks? Supply the whole task diff and relevant tests; reject arbitrary cosmetic preferences, not material UX defects. For trivial labels, ordinary isolated UI and style changes, the implementer's preflight review is enough. If a material finding requires a fix, run its targeted test and (if needed) the standard check again; at most one focused recheck, no review loops.
 5. Commit only task files, request required push approval, create/update ONE PR into the integration branch and verify its target. **Never end after reporting tests passed without a PR.** The project OpenCode V2 delivery-guard plugin checks the Git state at normal session completion and injects at most two task continuations if no verified PR exists. This is not a substitute for PR/CI review; if the bounded gate cannot finish, report INCOMPLETE rather than a false success. A regular PR is appropriate if required fast checks pass and no material blocker remains. Note which tests ran and which optional tests were not required. Only the owner merges. Never claim device/browser E2E unless actually executed.
 
 ## Adaptive reviewer effort
@@ -43,7 +44,7 @@ Keep one read-only reviewer role. The delivery plugin selects the actual GPT-6 L
 | Medium: over 100 lines or 3 files, up to 400 lines and 8 files; or risk-flagged changes | High |
 | Large: over 400 changed lines or 8 files | Extra High (xhigh) |
 
-These are initial tuning thresholds, not quality quotas. A risk flag raises a small review to at least High. Large changes require independent review. Small routine edits still use the existing self-review policy; no mandatory independent reviewer for trivial changes. Select one level once, not three successive reviews. For required review the child session must actually use Luna at the required effort or stronger; a weaker variant cannot satisfy the publication gate. Never claim a variant was used without observing it; unsupported variants block required review rather than silently falling back. Sol planning/architect routing and build effort are unchanged.
+These are initial tuning thresholds, not quality quotas. A risk flag raises a small review to at least High. Large changes require independent review. Small routine edits still use the existing self-review policy; no mandatory independent reviewer for trivial changes. Select one level once, not three successive reviews. For required review the child session must actually use Luna at the required effort or stronger; a weaker variant cannot satisfy the publication gate. Never claim a variant was used without observing it; unsupported variants block required review rather than silently falling back. Planning, architect and build default to Luna Medium; no automatic premium-model escalation.
 
 ## Enforced risk gate
 

@@ -94,6 +94,7 @@ jobs:
             test -f "$tmp/.flutter-harness/bin/init-product.py"
             test -f "$tmp/.flutter-harness/PRODUCT.md"
             test -f "$tmp/.flutter-harness/product.json"
+            python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["ui_profile"] == "universal"' "$tmp/.flutter-harness/product.json"
             test -f "$tmp/.flutter-harness/templates/product/lib/design_system/design_system.dart.template"
             test -f "$tmp/.flutter-harness/bin/verify-pr.sh"
             test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
@@ -111,7 +112,7 @@ jobs:
             rm -rf "$tmp"
           done
 
-  adaptive-starter:
+  material-starter:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -130,9 +131,9 @@ jobs:
           python3 scripts/init-product.py "$tmp/app" --template templates/product
           cp templates/product/lib/main.dart.template "$tmp/app/lib/main.dart"
           mkdir -p "$tmp/app/test"
-          cp templates/product/smoke_test.dart.template "$tmp/app/test/adaptive_test.dart"
+          cp templates/product/smoke_test.dart.template "$tmp/app/test/material_test.dart"
           cd "$tmp/app"
-          flutter pub add 'material_ui:^1.1.0' 'cupertino_ui:^1.1.7'
+          flutter pub add 'material_ui:^1.1.0'
           dart format lib test
           flutter analyze
           flutter test

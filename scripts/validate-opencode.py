@@ -6,12 +6,11 @@ import json
 import sys
 from pathlib import Path
 
-SOL = "openai/gpt-6.2-sol"
 LUNA = "openai/gpt-6-luna"
 ROLES = {
     "build": f"{LUNA}#medium",
-    "plan": f"{SOL}#medium",
-    "architect": f"{SOL}#medium",
+    "plan": f"{LUNA}#medium",
+    "architect": f"{LUNA}#medium",
     "reviewer": f"{LUNA}#medium",
     "general": f"{LUNA}#medium",
     "explore": f"{LUNA}#low",
@@ -90,7 +89,8 @@ def validate(filename, profile):
     )
 
     provider = data.get("providers", {}).get("openai", {}).get("models", {})
-    for name, effort in (("gpt-6.2-sol", "medium"), ("gpt-6-luna", "medium")):
+    ensure("gpt-6.2-sol" not in provider, "no default Sol configuration")
+    for name, effort in (("gpt-6-luna", "medium"),):
         ensure(
             provider.get(name, {}).get("settings", {}).get("reasoningEffort") == effort,
             f"wrong model default effort: {name}",
