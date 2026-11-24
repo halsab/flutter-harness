@@ -49,7 +49,9 @@ the minimum decisive code/contract excerpts and observed evidence, known
 alternatives, and the expected decision. Initial prompt budget: aim for
 under 4,000 tokens of task-specific input, a concise answer (about 500 words
 or less), no whole logs or repository dumps. These are guidance, not hard
-token limits. If material evidence cannot fit, stay with Luna High instead.
+token limits. The delivery plugin reserves at most one advisor tool attempt
+per tracked root task in the supported hooks; failed dispatch consumes it.
+An entirely new root session is not automatically linked to the old budget. If material evidence cannot fit, stay with Luna High instead.
 Advisor has no file-read/edit, shell or child delegation permission in the
 supplied profiles. It must identify missing facts instead of guessing.
 Return decision, rationale, alternatives rejected, affected invariants,
@@ -163,6 +165,39 @@ slices. Run existing final standard and risk-based independent review
 once on the actual integrated candidate (and bounded recheck if needed).
 One task branch and one PR, only parent publishes; never auto-merge.
 Do not call every local child or intermediate check a delivered feature.
+
+## Resource-aware execution
+
+Keep the original behavior contract and affected interface facts in each
+slice; include only the files and acceptance examples it needs. Do not send
+the entire parent transcript, diff or long build logs to every child.
+A Low worker should return a concise summary and suggested targeted check.
+Use one representative runtime capture per affected state/theme as required
+by PRODUCT.md; avoid rebuilding every platform after unrelated fixes.
+One standard check on the final stable candidate, reuse observed successful
+evidence on unchanged source/tests/spec. If a check failed, first inspect
+the earliest actual failure, reduce to a focused case and change the
+implementation or test fixture for a reason; run affected checks before
+one final standard confirmation. Do not rerun the same failing command
+repeatedly without a changed hypothesis. After two unsuccessful fixes to
+one cause, use one focused Luna High diagnosis if it adds information.
+Do not automatically escalate to Sol or add an unrelated refactor.
+
+Independent review remains mandatory for actual risk or large changes
+(>400 changed lines or >8 source/test files), normally Luna High; no
+automatic xhigh for size. A small eligible review can use Medium.
+At most one initial review and one targeted re-review. Preserve the original
+acceptance criteria and actual same-candidate check/review gate.
+The plugin reserves two review tool attempts; a failed dispatch consumes
+an attempt. If exhausted with unresolved issues, preserve progress and
+report INCOMPLETE, never bypass.
+
+Automatic idle recovery distinguishes missing/failed check, missing review
+and remaining work/delivery; at most two continuations, stopping earlier
+if candidate/check/delivery evidence is unchanged. Genuine permission,
+provider or unavailable required device blockers must be reported honestly.
+No hard wall-clock or token budget is inferred from subscription counters.
+Do not artificially stop a healthy complex task simply because it is long.
 
 ## Measure before increasing concurrency
 
