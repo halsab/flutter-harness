@@ -89,8 +89,8 @@ safe areas, responsive layout, semantics, and large-text support.
 
 For a material new screen, redesign, major navigation/flow or design-system
 change, inspect actual rendered screenshots of the changed screen(s), with
-representative content and the key changed state. For initial Material adoption or a shared theme change inspect light and dark
-on one representative runtime platform. Inspect another platform only for an
+representative content and the key changed state. For initial Material adoption
+or a shared theme change inspect light and dark on one representative runtime platform. Inspect another platform only for an
 actual platform-specific change or risk; inspect wide layout when affected.
 For isolated changes inspect only affected states and representative widths.
 Check narrow/large layouts and large text using fast widget assertions where

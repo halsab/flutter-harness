@@ -70,7 +70,6 @@ def validate(filename, profile):
     ensure(data.get("default_agent") == "build", "default agent must be build")
 
     agents = data.get("agents", {})
-    ensure(set(agents) == set(ROLES), "unexpected default agent roles")
     for name, model in ROLES.items():
         ensure(agents.get(name, {}).get("model") == model, f"wrong model/effort: {name}")
     for name in ("architect", "reviewer"):

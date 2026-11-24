@@ -22,7 +22,8 @@ Copyright (c) 2026 **halsab** — [MIT License](LICENSE).
 
 One default feature-first MVVM architecture and Material 3 on Android, iOS
 and Flutter Web (`ui_profile: universal`). Custom styling builds on Material.
-Adaptive and Minimal are legacy profile values, not new starter options. Read [the product standard](templates/product/PRODUCT.md).
+Adaptive and Minimal are legacy profile values, not new starter options.
+Existing installations need a [reviewed configuration/source migration](docs/material-migration.md). Read [the product standard](templates/product/PRODUCT.md).
 Installation adds the policy, product.json (pending adoption), non-destructive
 design-system starter and executable architecture/style-import convention check.
 The agent adopts the baseline and activates it in the first product PR;
@@ -165,8 +166,10 @@ postconditions prevent that class of false failure.
 ## Models, permissions and verification
 
 OpenCode V2 defaults to **GPT-6 Luna medium** for implementation and focused
-final review. Planning and focused diagnosis also default to Luna Medium. No automatic
-premium-model escalation; explicit user model selection remains possible.
+final review. Planning and focused diagnosis also default to Luna Medium.
+No automatic premium-model escalation; explicit user model selection remains
+possible. See the [model routing and safety guide](docs/model-routing.md).
+Templates contain no credentials; authorize your provider locally.
 
 The templates ask before accessing paths outside the project, ask before Git
 pushes and GitHub API operations, and deny direct `gh pr merge` and common

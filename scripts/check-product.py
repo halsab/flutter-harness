@@ -43,7 +43,7 @@ def feature_info(path):
     p = PurePosixPath(path).parts
     return (p[1], p[2]) if len(p) >= 4 and p[0] == "features" else (None, None)
 
-def inspect(root, ui_profile='adaptive'):
+def inspect(root, ui_profile):
     errors = []
     lib = root / "lib"
     pubspec = (root / "pubspec.yaml").read_text(encoding="utf-8")
@@ -132,7 +132,7 @@ def verify(root, base=None):
         return [] if pending_allowed(root, base) else ["product foundation pending; migrate and activate before application delivery"]
     if settings.get("status") != "active":
         return ["invalid product status"]
-    return inspect(root, settings['ui_profile'])
+    return inspect(root, settings["ui_profile"])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
