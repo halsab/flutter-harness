@@ -3,8 +3,9 @@
 The reusable Harness aims for quick, stable, high-quality autonomous Flutter delivery.
 
 - One short feature request -> implementation -> minimal verification -> PR; no redundant technical approvals, worktree choice or repeated planning.
-- Default GPT-6 Luna medium for build; per-session UI variant may override config. Plan and diagnose with Luna Medium; no automatic Sol or premium-model escalation.
+- Default GPT-6 Luna medium for build; per-session UI variant may override config. Plan complex work and diagnose hard failures with Luna High, delegate small stable-contract slices to Luna Low; optional Sol Medium advisor once per original task for a consequential compact architectural decision; no premium implementation or automatic escalation. Follow templates/product/ORCHESTRATION.md for large tasks; one parent owns delivery.
 - Keep local changes safe; stage only task files, never auto-merge, force-push, publish or bypass permission denials. Never claim a feature delivered unless verify-pr.sh confirms its open PR contains the local HEAD.
+- Material new/changed product behavior: establish a compact behavior contract using templates/product/BEHAVIOR.md before code or design; check interacting states, preserved behavior, failures and acceptance examples. No new document for trivial work.
 - Default code gate: one check.sh standard (format, analyzer, fast unit/widget tests). Add focused Dart unit tests for business rules and persistence; widget tests only for meaningful stateful UI behavior. No tests for trivial labels/boilerplate or arbitrary coverage targets.
 - Device/browser integration tests are optional and risk-triggered, not automatic for every feature. Prefer repeatable scripted assertions and exit statuses, not free-form AI screenshot interpretation. Run only relevant platforms.
 - A hidden item under an active filter is not missing persisted data. Establish preconditions and verify state before classifying behavior as failed. Avoid repeated UI tool experiments.
@@ -12,6 +13,6 @@ The reusable Harness aims for quick, stable, high-quality autonomous Flutter del
 - Optional E2E not run is NOT RUN (not required), never a reason for mandatory Draft. Failed required checks and material unresolved issues keep Draft. Report actual checks honestly.
 - Keep main.dart focused on app bootstrap for growing apps; put screen and state transformations in a feature folder without introducing state-management packages gratuitously. Refactor existing monoliths separately rather than grow them indefinitely.
 - Persistent-data mutations, bulk deletion and tests removed after a failed run require actual standard-check and independent reviewer evidence on the same candidate before publication. Never delete a meaningful failing acceptance test to turn CI green. Fix formatting before a standard run.
-- Select reviewer Luna Medium/High/Extra High (xhigh) from actual diff size; risk-flagged changes use at least High and large changes require review. One reviewer, no repeated tier escalation. Verify actual child model/effort for required review.
+- Select reviewer Luna Medium/High from actual diff size; risk-flagged changes use at least High and large changes require review. No automatic xhigh. At most two review attempts; reuse unchanged evidence. Verify actual child model/effort for required review.
 - Product baseline: follow templates/product/PRODUCT.md; feature-first MVVM, Material 3 everywhere by default, design-system reuse, Flutter Web, material UX changes require actual visual inspection. Keep executable convention checks and non-destructive installation.
 - CI stays lightweight; no hosted mobile/browser E2E added merely because local tools are unreliable.

@@ -12,12 +12,17 @@ is not part of the default experience.
 | Focused independent final diff review | `reviewer` | GPT-6 Luna | medium |
 | Codebase search when beneficial | `explore` | GPT-6 Luna | low |
 | Routine delegated work | `general` | GPT-6 Luna | medium |
-| Complex architecture or hard diagnosis | `architect` | GPT-6 Luna | medium |
-| Explicit manual planning | `plan` | GPT-6 Luna | medium |
+| Complex decomposition, architecture or hard diagnosis | `architect` | GPT-6 Luna | high |
+| Explicit manual planning | `plan` | GPT-6 Luna | high |
+| Optional focused architectural decision | `advisor` | GPT-6.2 Sol | medium |
+| Bounded implementation slice | `worker` | GPT-6 Luna | low |
 | Title, summary, compaction | maintenance agents | GPT-6 Luna | low |
 
-No default role routes to Sol or another premium model. Explicit user model
-selection remains possible; do not switch automatically. The autonomous
+Only optional advisor routes to Sol, for at most one compact consequential
+architectural decision per original task. The build parent gathers evidence
+and retains implementation, integration and verification. No premium whole-task
+planning, coding, review or automatic escalation on failure. See the advisor
+conditions in the orchestration guide. Explicit user model selection remains possible. The autonomous
 default does not force an architect consultation or
 independent reviewer for simple features. The implementer checks the diff once,
 and the standard deterministic Flutter tests/analyzer supply ordinary
@@ -50,6 +55,19 @@ profile, inspect `opencode debug config` and verify the effective plugin
 and skill set in a **new session**. Static CI cannot demonstrate that a
 previously running session has unloaded the old plugin.
 
+## Large tasks: one flow, selective delegation
+
+The Medium build agent orchestrates; High architect plans across actual
+product/state/architecture dependencies; optional Sol Medium advisor resolves a
+compact difficult decision when justified; Low worker handles one bounded
+source/test slice. Use the [orchestration guide](../templates/product/ORCHESTRATION.md)
+and task-plan.py for dependency and file-conflict checks. Use at most two
+independent workers concurrently. Parent owns shared build/test state,
+integration and the final PR. No manual user switching between phases.
+Measure total usage across parent and child sessions; concurrency can reduce
+wall time but may increase tokens. Actual OpenCode scheduling, permission
+behavior and model variants need a live trial in the installed version.
+
 ## Tools, testing and context budget
 
 Default on ordinary features: run check.sh standard once after implementation,
@@ -75,8 +93,11 @@ Optional E2E NOT RUN is not a blocker. Failed required high-risk checks
 or unresolved material review findings require Draft PRs.
 
 Keep MCP discovery bounded, skip whole-project searches for small changes,
-and avoid repeated full-codebase reviews. Usage limits are preferences, not
-hard enforced model caps. Inspect real session exports to measure overhead.
+and avoid repeated full-codebase reviews. The delivery plugin reserves at most one advisor and two reviewer tool
+attempts per tracked root task, with phase-aware idle recovery and early
+stop on no progress. Input/output token targets remain preferences, not
+hard enforced subscription caps. A new root session is not automatically
+linked to the previous budget. Inspect real session exports to measure overhead.
 See docs/verification-policy.md for the risk matrix.
 
 ## GitHub and authorization

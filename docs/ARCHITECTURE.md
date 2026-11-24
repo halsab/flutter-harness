@@ -36,7 +36,7 @@ The canonical application baseline is [Product foundation](../templates/product/
 - Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
 - Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
 - Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.
-- Prefer Luna Medium for implementation, planning and focused diagnosis; reviewer effort follows the existing risk gate. No automatic premium-model escalation.
+- Use Luna Medium for implementation and orchestration, Luna High for complex planning and diagnosis, Luna Low for bounded slices. Optional Sol Medium advisor is reserved for one compact consequential architectural decision per original task. Reviewer effort follows the existing risk gate. No automatic premium escalation.
 - Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
 
 ## Development status

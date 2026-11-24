@@ -7,10 +7,13 @@ import sys
 from pathlib import Path
 
 LUNA = "openai/gpt-6-luna"
+SOL = "openai/gpt-6.2-sol"
 ROLES = {
     "build": f"{LUNA}#medium",
-    "plan": f"{LUNA}#medium",
-    "architect": f"{LUNA}#medium",
+    "plan": f"{LUNA}#high",
+    "architect": f"{LUNA}#high",
+    "advisor": f"{SOL}#medium",
+    "worker": f"{LUNA}#low",
     "reviewer": f"{LUNA}#medium",
     "general": f"{LUNA}#medium",
     "explore": f"{LUNA}#low",
@@ -79,6 +82,21 @@ def validate(filename, profile):
         ensure(REVIEW_READONLY <= subagent_rules, f"{name} isn't read-only")
         allowed_shell = {rule for rule in subagent_rules if rule[0] == "shell" and rule[2] == "allow"}
         ensure(allowed_shell <= REVIEW_READONLY, f"{name} permits unexpected shell commands")
+    worker = agents["worker"]
+    ensure(worker.get("mode") == "subagent", "worker must be a subagent")
+    worker_rules = ruleset(worker.get("permissions"))
+    for action in ("shell", "subagent", "question", "external_directory", "browser", "dart_*", "maestro_*", "playwright_*", "chrome-devtools_*", "xcode_*", "xcodebuild_*", "generate_image", "webfetch", "websearch"):
+        ensure((action, "*", "deny") in worker_rules, f"worker must deny {action}")
+    ensure(not any(effect == "allow" for _, _, effect in worker_rules), "worker must not override its restrictions")
+    advisor = agents["advisor"]
+    ensure(advisor.get("mode") == "subagent", "advisor must be a subagent")
+    advisor_rules = ruleset(advisor.get("permissions"))
+    ensure(worker_rules <= advisor_rules, "advisor must inherit worker restrictions")
+    for action in ("edit", "read", "grep", "glob", "list", "skill"):
+        ensure((action, "*", "deny") in advisor_rules, f"advisor must deny {action}")
+    ensure(not any(effect == "allow" for _, _, effect in advisor_rules), "advisor must not override restrictions")
+    ensure(all(name == "advisor" or agent.get("model", "").startswith(LUNA + "#")
+               for name, agent in agents.items()), "only advisor may route outside Luna in supplied profile")
     ensure("OPEN" in agents["reviewer"].get("description", ""), "reviewer must report incomplete coverage as OPEN")
 
     ensure(REQUIRED_SAFETY <= ruleset(data.get("permissions")), "missing safety permissions")
@@ -89,8 +107,7 @@ def validate(filename, profile):
     )
 
     provider = data.get("providers", {}).get("openai", {}).get("models", {})
-    ensure("gpt-6.2-sol" not in provider, "no default Sol configuration")
-    for name, effort in (("gpt-6-luna", "medium"),):
+    for name, effort in (("gpt-6-luna", "medium"), ("gpt-6.2-sol", "medium")):
         ensure(
             provider.get(name, {}).get("settings", {}).get("reasoningEffort") == effort,
             f"wrong model default effort: {name}",

@@ -13,10 +13,15 @@ Harness-owned baseline files below, merging intentional project overrides:
 - templates/product/PRODUCT.md -> .flutter-harness/PRODUCT.md
 - templates/product/* -> .flutter-harness/templates/product/ (starter files)
 - scripts/check-product.py -> .flutter-harness/bin/check-product.py
+- scripts/task-plan.py -> .flutter-harness/bin/task-plan.py; add /.flutter-harness/work/ to .gitignore.
+- plugins/delivery-guard/{index.js,guard.mjs,quality.mjs,resources.mjs} ->
+  .opencode/plugins/delivery-guard/ as one reviewed compatible set; do not
+  update only index.js. Preserve intentional project overrides.
 - skills/flutter-harness/SKILL.md -> .opencode/skills/flutter-harness/SKILL.md
 - templates/opencode-<profile>.jsonc -> corresponding local OpenCode config;
   merge model routes and retain authentication, permissions and other user
-  settings. All built-in roles now use Luna. Confirm effective routes in a
+  settings. All routine roles use Luna; optional focused advisor uses Sol Medium.
+  Confirm effective routes in a
   fresh OpenCode session; existing sessions may retain old configuration.
 - Update only the Flutter Harness marked section in AGENTS.md to match
   scripts/install.sh. Preserve unrelated project instructions.
@@ -41,5 +46,5 @@ is migrated set ui_profile to universal and status active; run the standard
 checks and required visual inspection on the actual app.
 
 After this focused migration is accepted, design and implement new features
-in separate tasks. No automatic Sol escalation, no compulsory UIKit-like
+in separate tasks. No automatic Sol escalation (only the bounded advisor exception), no compulsory UIKit-like
 animations, no third-party visual kit for routine tasks.

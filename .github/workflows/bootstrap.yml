@@ -25,7 +25,7 @@ jobs:
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
       - name: Verify OpenCode delivery-guard logic (no model calls)
-        run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs
+        run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs scripts/test_resources.mjs
       - name: Check runner stops at formatting failure
         run: |
           set -euo pipefail
@@ -91,8 +91,14 @@ jobs:
             test -f "$tmp/.flutter-harness/bin/maestro.sh"
             test -f "$tmp/.flutter-harness/bin/check.sh"
             test -f "$tmp/.flutter-harness/bin/check-product.py"
+            test -f "$tmp/.flutter-harness/bin/task-plan.py"
+            test -f "$tmp/.flutter-harness/templates/product/ORCHESTRATION.md"
+            test "$(grep -Fxc '/.flutter-harness/work/' "$tmp/.gitignore")" -eq 1
             test -f "$tmp/.flutter-harness/bin/init-product.py"
             test -f "$tmp/.flutter-harness/PRODUCT.md"
+            test -f "$tmp/.flutter-harness/templates/product/BEHAVIOR.md"
+            test -f "$tmp/.flutter-harness/templates/product/DESIGN.md"
+            test -f "$tmp/.flutter-harness/templates/product/references/content-priority.svg"
             test -f "$tmp/.flutter-harness/product.json"
             python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["ui_profile"] == "universal"' "$tmp/.flutter-harness/product.json"
             test -f "$tmp/.flutter-harness/templates/product/lib/design_system/design_system.dart.template"
@@ -100,6 +106,7 @@ jobs:
             test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
             test -f "$tmp/.opencode/plugins/delivery-guard/guard.mjs"
             test -f "$tmp/.opencode/plugins/delivery-guard/quality.mjs"
+            test -f "$tmp/.opencode/plugins/delivery-guard/resources.mjs"
             test -f "$tmp/.flutter-harness/bin/verify-e2e.py"
             if [[ "$profile" == "mobile-web" ]]; then
               test -f "$tmp/.flutter-harness/bin/web-preview.py"

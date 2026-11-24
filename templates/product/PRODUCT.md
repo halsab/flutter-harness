@@ -34,6 +34,18 @@ choice; document genuine architectural exceptions rather than bypass checks.
 - Independent features must not import each other's internals. Compose them
   in app, or extract a shared contract/model to core if warranted.
 
+## Product behavior before visual design
+
+For material new/changed behavior use the behavior contract guide
+(BEHAVIOR.md in the reusable product template, installed at
+.flutter-harness/templates/product/BEHAVIOR.md). Resolve intent, state,
+combinations with existing features, failure paths and observable acceptance
+examples before code or visual concepts. Update one existing feature spec or
+docs/product/<feature>.md when warranted; no new document for trivial work.
+Independent controls remain independent unless the user job justifies an
+explicit dependency. Check the rules against the original request, not just
+implementation/test agreement. No extra approval or premium model by default.
+
 ## UX — design the flow, not a pile of controls
 
 For a new screen or meaningful UX change, privately identify primary user
@@ -85,6 +97,15 @@ Use the Material package compatible with the pinned SDK and existing project.
 No new UI library dependency merely for styling. Preserve keyboard/focus,
 safe areas, responsive layout, semantics, and large-text support.
 
+## Visual design before implementation
+
+For a substantial new screen, flow or redesign follow the compact DESIGN.md
+guide in .flutter-harness/templates/product/. Define the behavior first;
+choose a visual direction using relevant actual reference images and Material
+patterns before delegating or coding UI. Keep the selected direction and
+interaction notes in the task handoff. No mandatory mockup for ordinary UI
+changes, no separate design-review agent, no premium model for visual design.
+
 ## Visual acceptance and review
 
 For a material new screen, redesign, major navigation/flow or design-system
@@ -99,7 +120,8 @@ Use actual local simulator/browser captures, not mockups or Ahem widget-test
 screenshots as proof of polished visual design. Save local previews under
 .flutter-harness/previews/ (ignored); include exact paths/viewport/platform
 in reviewer handoff and PR, attach screenshots when supported.
-Review hierarchy, spacing, discoverability, clipping, theme, states,
+Compare the actual rendered result with the selected direction, original
+request and behavior contract. Review hierarchy, spacing, discoverability, clipping, theme, states,
 platform behavior and reuse. Material hierarchy or interaction defects are
 not cosmetic preferences. One read-only reviewer covers correctness,
 architecture and UX, not three separate agents. If runtime visual review is
@@ -130,16 +152,26 @@ a justified exception is required.
 
 ## Efficient delivery
 
+For broad or genuinely interacting changes use the installed ORCHESTRATION.md
+guide. One High-effort Luna architect plans across product and implementation
+boundaries; the Medium parent executes or delegates small stable-contract slices
+to Low-effort workers. Do not require a planner or worker for simple changes.
+
 Identify meaningful failure scenarios before editing. For failed targeted
 tests, fix the specific cause rather than rerun the whole suite; after two
 unsuccessful attempts at the same substantive failure, isolate the failing
-case and, if useful, consult the Luna Medium architect once for focused
+case and, if useful, consult the Luna High architect once for focused
 diagnosis. Apply the recommendation and check the affected behavior.
 Ordinary format failures do not need escalation. Failed checks are work to
 fix, not an external blocker. If bounded recovery fails, report INCOMPLETE.
-Do not automatically switch or delegate to a more expensive model; Sol or
-other premium models require explicit user selection or permission.
-Use one final standard check after implementation/review corrections. If
+The only standing premium-model exception is one focused Sol Medium advisor
+consultation per original task under ORCHESTRATION.md. No premium build,
+whole-project planning/review or automatic failure-based escalation. Other
+premium use requires explicit user permission.
+Use one final standard check after implementation/review corrections.
+Reuse observed successful checks and review on unchanged source/tests/spec;
+no duplicate full runs solely because the session resumed. Follow the
+resource-aware recovery policy in ORCHESTRATION.md. If
 independent review is required, it may run concurrently with deterministic
 checks on the unchanged candidate. Wait for review result without duplicate
 review requests or unrelated edits. Fix material findings, run affected

@@ -1,6 +1,6 @@
 # Verification policy: speed with quality
 
-Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior.
+Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior. For material changes, derive acceptance evidence from the product behavior contract and original request before implementation; correct contradictory product rules, not just the code. See [the behavior guide](../templates/product/BEHAVIOR.md).
 
 Add tests only for important public behavior:
 - Dart unit tests for validation, calculations, business decisions, persistence,
@@ -27,9 +27,9 @@ device-input failures; then report the optional test blocked rather than
 looping. An optional unrun E2E does not block a routine PR; a failed REQUIRED
 risk-based gate does.
 
-For product projects the standard runner also checks architecture and design-system conventions. Substantial new screens/redesigns require real visual inspection and the same independent reviewer, not an additional design agent or functional E2E suite. See templates/product/PRODUCT.md. Anticipate rejected writes before first review; use targeted checks during iteration, and run required reviewer and final check concurrently only when source is stable.
+For product projects the standard runner also checks architecture and design-system conventions. Substantial new screens/redesigns require real visual inspection and the same independent reviewer, not an additional design agent or functional E2E suite. See templates/product/PRODUCT.md and DESIGN.md: choose the visual direction before code, then inspect actual implementation against it and the behavior contract. Anticipate rejected writes before first review; use targeted checks during iteration, and run required reviewer and final check concurrently only when source is stable.
 
 An independent reviewer is optional for isolated routine work, but use one focused pre-PR review for material cross-feature interactions (e.g. sorting+search+filter) and genuine high risks. It must check acceptance criteria, missing regression assertions and material product/UX defects, not arbitrary cosmetic preferences. Test/review overhead should not overwhelm
 implementation.
 
-Reviewer effort is adaptive: Luna Medium for <=100 lines and <=3 files, High for <=400 lines and <=8 files or risk flags, Extra High (xhigh) above either large-change threshold. Count source/test additions and deletions, not generated lockfiles. Large changes require independent review; isolated trivial changes still skip it. One reviewer per review stage; required review evidence must match the actual selected Luna variant and candidate. Tune thresholds from observed quality, time and token use.
+Reviewer effort is adaptive: Luna Medium for <=100 lines and <=3 files without risk flags, High for larger or risk-flagged changes. No automatic xhigh; explicit stronger Luna review may be selected by the owner. Count source/test additions and deletions, not generated lockfiles. Large changes require independent review; isolated trivial changes still skip it. At most two review attempts per tracked root task (initial and targeted recheck); required review evidence must match the actual selected Luna variant and candidate. Tune thresholds from observed quality, time and token use.
