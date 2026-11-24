@@ -28,8 +28,21 @@ test("review effort scales with diff size and risk, not the builder's choice", (
 test("only delivery commands and standard checks match", () => {
   for (const c of ["git push -u origin feature/a", "gh pr create --base app", "gh pr ready 1", "git status && git push"]) assert.ok(publishing(c), c);
   for (const c of ["git diff", "gh pr view 1", "flutter test"]) assert.equal(publishing(c), false);
-  assert.ok(standardCheck("bash .flutter-harness/bin/check.sh . standard mobile-web"));
-  assert.equal(standardCheck("bash .flutter-harness/bin/check.sh . quick"), false);
+  // Regression: the default mode is standard, just as in check.sh.
+  for (const c of [
+    "bash .flutter-harness/bin/check.sh .",
+    "bash .flutter-harness/bin/check.sh . standard",
+    "bash .flutter-harness/bin/check.sh . standard mobile-web",
+    "bash .flutter-harness/bin/check.sh . standard mobile",
+    "./.flutter-harness/bin/check.sh .",
+  ]) assert.ok(standardCheck(c), c);
+  for (const c of [
+    "bash .flutter-harness/bin/check.sh",
+    "bash .flutter-harness/bin/check.sh . quick",
+    "bash .flutter-harness/bin/check.sh . quick mobile-web",
+    "echo .flutter-harness/bin/check.sh . standard",
+    "bash .flutter-harness/bin/check.sh . standard && echo done",
+  ]) assert.equal(standardCheck(c), false, c);
 });
 test("review requires final exact PASS, not a build-agent claim or earlier PASS", () => {
   const m = text => ({ type: "assistant", content: [{type:"text", text}] });
@@ -87,7 +100,7 @@ test("large untracked source counts toward review effort and stays stable after 
   assert.deepEqual(after.size,before.size);
 });
 test("mock V2 hooks deny risky push until real child PASS at required effort, then preserve ask; stale source blocks again", async t => {
-  const {root}=await fixture(t);
+  const {root,git}=await fixture(t);
   const values=new Map([["task/main",{active:true,request:"Удалить все завершённые задачи"}]]);
   const hooks={}; let child={parentID:"main",agent:"reviewer",outcome:"running",model:{providerID:"openai",id:"gpt-6-luna",variant:"medium"}};
   const ctx={
@@ -99,7 +112,7 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
   const publish=async()=>{const e={sessionID:"main",action:"shell",resources:["git push -u origin feature/bulk"],effect:"ask"};await hooks.evaluate(e);return e;};
   assert.equal((await publish()).effect,"deny");
-  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"bash .flutter-harness/bin/check.sh . standard mobile-web"}};
+  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"bash .flutter-harness/bin/check.sh ."}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   assert.equal((await publish()).effect,"deny");
@@ -112,6 +125,10 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   child={...child,outcome:"succeeded"};
   assert.equal((await publish()).effect,"deny", "Medium cannot satisfy a High review");
   child={...child,model:{...child.model,variant:"high"}};
+  assert.equal(await q.reason("main"),"");
+  assert.equal((await publish()).effect,"ask");
+  // Committing identical content does not invalidate the successful default check or review.
+  git("add","."); git("commit","-qm","reviewed change");
   assert.equal(await q.reason("main"),"");
   assert.equal((await publish()).effect,"ask");
   await writeFile(join(root,"lib/data/task_repository.dart"),"void deleteCompletedTasks() { throw StateError('bad'); }\n");
