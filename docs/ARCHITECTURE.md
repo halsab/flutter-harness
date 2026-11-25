@@ -35,3 +35,7 @@ abstract graph declarations into a false delivery guarantee.
 ## Execution redesign (decision, staged migration)
 
 The current plugin remains the delivery guard during migration. See [Execution v3](execution-v3.md) for the audit, target controller, gates and acceptance criteria. The first stage moves check supervision to a bounded Python runner and makes diagnostics independent of model/session availability; it does not yet replace idle recovery.
+
+## Worktree isolation
+
+Owner-side workspace.py is a thin Git/CLI manager, not another agent. Separate worktrees and durable platform leases isolate state and runtime; cumulative detached integration checks produce ordered exact-tree evidence. See [Worktrees](worktrees.md).

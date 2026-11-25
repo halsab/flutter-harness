@@ -13,7 +13,11 @@ import { registerResourceGuard } from "./resources.mjs";
 export default Plugin.define({
   id: "flutter-harness-delivery",
   async setup(ctx) {
-    const root = ctx.location.project?.directory || ctx.location.project?.canonical || ctx.location.directory;
+    const location = ctx.location.directory;
+    if (!location) throw Error("Harness requires an explicit OpenCode working directory");
+    const root = (await exec("git",["rev-parse","--show-toplevel"],{cwd:location,timeout:15000})).stdout.trim();
+    const expected=process.env.HARNESS_WORKSPACE_ROOT;
+    if (expected && root!==expected) throw Error("OpenCode location differs from assigned Harness worktree: "+expected);
     const config = JSON.parse(await readFile(join(root, ".flutter-harness/config.json"), "utf8"));
     if (config.schema !== 2 || typeof config.integration_branch !== "string" || !config.integration_branch) throw Error("Harness schema 2 configuration required");
     const base = config.integration_branch;
