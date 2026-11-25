@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
-# Bootstrap verification. The planned Dart CLI will replace this script.
+# Deterministic verification runner.
 set -u
 set -o pipefail
 usage() { echo "Usage: bash scripts/check.sh PROJECT [quick|standard|full] [mobile|mobile-web]" >&2; exit 2; }
 PROJECT="${1:-}"
 LEVEL="${2:-standard}"
-PROFILE="${3:-mobile}"
+PROFILE="${3:-}"
 [[ -n "$PROJECT" && -f "$PROJECT/pubspec.yaml" ]] || usage
 [[ "$LEVEL" == "quick" || "$LEVEL" == "standard" || "$LEVEL" == "full" ]] || usage
+# Resolve the installed profile in code, not in an agent prompt. Keep the
+# historical mobile default for uninstalled projects and explicit overrides.
+if [[ -z "$PROFILE" ]]; then
+  if [[ -e "$PROJECT/.flutter-harness/config.json" ]]; then
+    PROFILE="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["profile"])' "$PROJECT/.flutter-harness/config.json")" || {
+      echo "BLOCKED: cannot read installed Harness profile" >&2
+      exit 3
+    }
+    [[ "$PROFILE" == "mobile" || "$PROFILE" == "mobile-web" ]] || {
+      echo "BLOCKED: invalid installed Harness profile: $PROFILE" >&2
+      exit 3
+    }
+  else
+    PROFILE=mobile
+  fi
+fi
 [[ "$PROFILE" == "mobile" || "$PROFILE" == "mobile-web" ]] || usage
 command -v flutter >/dev/null 2>&1 || { echo "BLOCKED: flutter missing from PATH" >&2; exit 3; }
 command -v dart >/dev/null 2>&1 || { echo "BLOCKED: dart missing from PATH" >&2; exit 3; }
@@ -19,6 +35,7 @@ LOG="$LOG_DIR/check-$ID.log"
 RESULT="$LOG_DIR/check-$ID.tsv"
 printf 'check\tstatus\texit_code\n' > "$RESULT"
 failed=0
+printf 'Profile: %s; level: %s\n' "$PROFILE" "$LEVEL"
 
 check() {
   local label="$1"
