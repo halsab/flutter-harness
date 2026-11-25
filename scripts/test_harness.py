@@ -54,7 +54,7 @@ class Lifecycle(unittest.TestCase):
         return subprocess.check_output(["git","-C",str(self.root),*args],stderr=subprocess.PIPE).decode().strip()
 
     def receipt(self, files):
-        h.atomic_json(h.work(self.root)/"check.json", {"status":"PASS","digest":h.fingerprint(self.root)})
+        h.atomic_json(h.work(self.root)/"check.json", {"status":"PASS","digest":h.fingerprint(self.root),"checked_at":123})
         h.atomic_json(h.work(self.root)/"delivery.json",{"files":files,"message":"feat: change","title":"Change","body":"Verified","required_e2e":[]})
 
     def test_candidate_covers_native_and_is_stable_across_commit(self):
@@ -85,19 +85,24 @@ class Lifecycle(unittest.TestCase):
         self.write("lib/main.dart","new")
         self.receipt(["lib/main.dart"])
         real = h.run
-        state = {"exists":False,"create":0,"edit":0}
+        state = {"exists":False,"create":0,"edit":0,"push":0,"body":"","title":"","head":""}
         def mocked(root,*args,**kwargs):
             if args[0] != "gh":
+                if args[:2] == ("git", "push"):
+                    state["push"] += 1
                 return real(root,*args,**kwargs)
             cmd = args[2]
             if cmd == "list":
-                items = [{"number":1,"baseRefName":"trunk","headRefName":"feature/test","isCrossRepository":False,"headRepositoryOwner":{"login":"owner"},"isDraft":False}] if state["exists"] else []
+                items = [{"number":1,"baseRefName":"trunk","headRefName":"feature/test","isCrossRepository":False,"headRepositoryOwner":{"login":"owner"},"isDraft":False,"state":"OPEN","url":"https://github.com/owner/demo/pull/1","headRefOid":state["head"],"title":state["title"],"body":state["body"]}] if state["exists"] else []
                 return json.dumps(items).encode()
             if cmd == "create":
                 state["create"] += 1
                 if state["create"] == 1:
                     raise h.Blocked("temporary GitHub error")
                 state["exists"] = True
+                state["head"] = self.git("rev-parse", "HEAD")
+                state["title"] = args[args.index("--title")+1]
+                state["body"] = Path(args[args.index("--body-file")+1]).read_text()
                 return b""
             if cmd == "edit":
                 state["edit"] += 1
@@ -110,11 +115,21 @@ class Lifecycle(unittest.TestCase):
                 h.deliver(self.root,self.c)
             head = self.git("rev-parse","HEAD")
             h.deliver(self.root,self.c)
+            result = h.completion(self.root,self.c)
+            self.assertEqual(result["head"], head)
+            (h.work(self.root)/"delivery-result.json").unlink()
+            with self.assertRaisesRegex(h.Blocked, "Missing delivery-result"):
+                h.completion(self.root,self.c)
             h.deliver(self.root,self.c)
+            self.assertEqual(h.completion(self.root,self.c)["head"],head)
             self.assertEqual(self.git("rev-parse","HEAD"),head)
             self.assertEqual(self.git("rev-list","--count","trunk..HEAD"),"1")
             self.assertEqual(state["create"],2)
-            self.assertEqual(state["edit"],1)
+            self.assertEqual(state["edit"],0)
+            self.assertEqual(state["push"],2)
+            self.write("lib/main.dart", "newer")
+            with self.assertRaisesRegex(h.Blocked, "Uncommitted"):
+                h.completion(self.root,self.c)
 
     def test_visual_requires_both_current_artifacts(self):
         digest = h.fingerprint(self.root)
