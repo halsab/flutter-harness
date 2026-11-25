@@ -107,15 +107,39 @@ and Chrome DevTools MCP servers have responded to basic local tool calls;
 the initial lab trial used Playwright for Web, but the Web flow is not yet
 recorded as a reusable Playwright script.
 
-Official Flutter skills can be installed using Flutter's published commands
-from the Flutter project root:
+Official Flutter and Dart skills are optional additions. Consult
+https://docs.flutter.dev/ai/get-started and install only skills that address a
+specific task or recurring gap; do not bulk-install the entire catalog by
+default. Prefer existing project conventions and direct Flutter/Dart tooling.
 
-```bash
-npx skills add flutter/agent-plugins --skill '*' --agent universal --yes
-npx skills add dart-lang/skills --skill '*' --agent universal --yes
-```
+## Lean context (default for new installations)
 
-See https://docs.flutter.dev/ai/get-started.
+The generated AGENTS.md block is the compact delivery workflow. In an active
+product, isolated fixes and ordinary features do not require opening the full
+flutter-harness skill. Load it for pending or unknown foundation adoption,
+substantial UI/architecture work, interacting behavior, high risk, multi-slice
+work or difficult recovery. Use the specific BEHAVIOR, DESIGN and ORCHESTRATION
+guides only when their triggers apply. Existing product standards, required
+checks and plugin delivery/risk gates remain in force; uncertainty selects
+the full workflow.
+
+This is an evidence-informed default, not a measured Flutter speedup:
+[Evaluating AGENTS.md](https://arxiv.org/abs/2602.11988) found higher inference
+cost without a general success-rate improvement; [SWE-Skills-Bench](https://arxiv.org/abs/2603.15401)
+found limited average benefit and some harmful skills; [An Empirical Study of
+Harness Design](https://arxiv.org/abs/2609.20804) supports model- and
+budget-aware component selection.
+
+Existing installations are preserved by install.sh. Review and replace only
+the managed Flutter Harness block between its start/end markers using the
+new block in scripts/install.sh; leave project-specific instructions intact.
+Do not overwrite existing product policy, skill files or OpenCode config.
+
+For initial live validation, use normal Lab tasks rather than a new benchmark
+suite: one isolated fix, one routine feature with a meaningful assertion, and
+one substantial UI change exercising the full workflow. Record actual checks,
+PR delivery and sanitized parent/child token counters when available. These
+are smoke trials, not statistical evidence of improvement.
 
 ## Verify
 
