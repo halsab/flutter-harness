@@ -43,7 +43,7 @@ def safe(root, name):
     return path
 
 
-def build(profile):
+def build(profile, base):
     result = {}
     for name in BINS:
         result[".flutter-harness/bin/" + name] = (SOURCE / "scripts" / name).read_bytes()
@@ -55,7 +55,7 @@ def build(profile):
     for path in template.rglob("*"):
         if path.is_file() and path.name not in ("PRODUCT.md", "product.json"):
             result[".flutter-harness/templates/product/" + path.relative_to(template).as_posix()] = path.read_bytes()
-    result[".github/workflows/flutter.yml"] = (SOURCE / "templates/project-ci.yml").read_bytes()
+    result[".github/workflows/flutter.yml"] = (SOURCE / "templates/project-ci.yml").read_text().replace("__HARNESS_BASE__", json.dumps(base)).encode()
     result["opencode.jsonc"] = (SOURCE / ("templates/opencode-" + profile + ".jsonc")).read_bytes()
     return result
 
@@ -64,7 +64,7 @@ def install(root, profile, base, adopt=False):
     require((root / "pubspec.yaml").is_file(), "Expected Flutter project")
     require(root != SOURCE, "Cannot install into Harness source")
     require(profile in ("mobile", "mobile-web"), "Invalid profile")
-    require(base and not base.startswith("-"), "Invalid base")
+    require(re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/-]*", base), "Invalid base")
     subprocess.run(["git", "check-ref-format", "--branch", base], check=True,
                    stdout=subprocess.DEVNULL)
     revision = git(SOURCE, "rev-parse", "HEAD")
@@ -79,7 +79,7 @@ def install(root, profile, base, adopt=False):
     require(not adopt or not previous, "--adopt is for the one-time pre-schema-2 migration")
     if adopt:
         require(not git(root, "status", "--porcelain"), "Adoption requires a clean Git checkout")
-    new = build(profile)
+    new = build(profile, base)
     new[".flutter-harness/config.json"] = (json.dumps({
         "schema": 2, "profile": profile, "integration_branch": base,
         "revision": revision}, indent=2) + "\n").encode()

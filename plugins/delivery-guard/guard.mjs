@@ -46,6 +46,7 @@ export function decide(before, current, intent, prOK, prMessage, base = "app") {
 }
 export async function inspect(root, base, before, intent) {
   const current = await snapshot(root);
+  if (!changed(before, current) && !intent) return { active:false, passed:true, reasons:[], current };
   const script = join(root, ".flutter-harness", "bin", "harness.py");
   const pr = await command(root, "python3", [script, "verify"]);
   return { ...decide(before, current, intent, pr.ok, pr.message, base), current };

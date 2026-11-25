@@ -149,6 +149,8 @@ def begin(root, c, name):
     current = text(git(root, "symbolic-ref", "--short", "HEAD"))
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
+        for filename in ("check.json","delivery.json","delivery-result.json","runtime.json","sessions.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+            (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
             "Feature branch does not contain current integration base")
@@ -233,7 +235,7 @@ def verify(root, c):
             data.get("headRefName") == name and data.get("headRefOid") == head and
             not data.get("isCrossRepository") and not data.get("isDraft"),
             "PR is draft, stale, closed, cross-repo or targets the wrong branch")
-    require(data.get("url", "").startswith("https://github.com/" + repo + "/pull/"),
+    require(data.get("url", "").lower().startswith("https://github.com/" + repo.lower() + "/pull/"),
             "Unexpected PR URL")
     output(status="PASS", pr=data["url"], head=head)
     return data
@@ -269,6 +271,7 @@ def deliver(root, c):
     require(not changed or set(changed) == set(files),
             "Dirty files differ from explicit task list; no files staged")
     require(not changed or not (set(files) & {".git"}), "Unsafe Git path")
+    require(not any(p.startswith((".flutter-harness/work/", ".flutter-harness/previews/")) for p in files), "Local artifacts must not be published")
     repo = origin_repo(root)
     base = c["integration_branch"]
     # Refresh base before publishing; never merge/rebase implicitly.
@@ -315,6 +318,13 @@ def scaffold(root, name, layers):
         target = root / "lib/features" / name / layer
         require(not any(p.is_symlink() for p in (target, *target.parents) if p != root and root in p.parents), "Symlink in scaffold path")
         target.mkdir(parents=True, exist_ok=True)
+        suffix = {"view_models": "view_model", "screens": "screen"}.get(layer)
+        if suffix:
+            file = target / (name + "_" + suffix + ".dart")
+            if not file.exists():
+                cls = "".join(part.capitalize() for part in name.split("_"))
+                template = root / ".flutter-harness/templates/product/scaffold" / (suffix + ".dart.template")
+                file.write_text(template.read_text().replace("@CLASS@", cls), encoding="utf-8")
     output(status="PASS", feature=name, layers=layers)
 
 
@@ -376,7 +386,7 @@ def capture(root, platform, label, theme, viewport):
     else:
         require(re.fullmatch(r"\d+,\d+", viewport), "Viewport must be width,height")
         run(root, "npx", "--no-install", "playwright", "screenshot",
-            "--viewport-size=" + viewport, "--color-scheme=" + theme,
+            "--viewport-size=" + viewport, "--color-scheme=" + theme, "--wait-for-timeout=1500",
             device, str(image))
     data = image.read_bytes()
     require(data.startswith(PNG) and len(data) > 24 and fingerprint(root) == digest,

@@ -149,7 +149,10 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     const change = await candidate(root, base, task.request || "", state.failedNames || []);
     try {
       const manifest = JSON.parse(await readFile(join(root, ".flutter-harness/work/delivery.json"),"utf8"));
-      if (manifest.review_required === true && !change.reasons.length) change.reasons.push("semantic or owner-requested independent review");
+      if (manifest.review_required === true && !change.reasons.length) {
+        change.reasons.push("semantic or owner-requested independent review");
+        change.effort = reviewEffort(change.size, change.reasons);
+      }
     } catch (err) { if (err.code !== "ENOENT") throw err; }
     return { task, state, change };
   }
