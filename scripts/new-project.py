@@ -12,6 +12,42 @@ HERE = Path(__file__).resolve().parent
 def run(*args, cwd=None):
     subprocess.run(args, cwd=cwd, check=True)
 
+def validate_target(root, name, base):
+    """Accept an empty project, including untracked Finder metadata, without deleting anything."""
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
+        raise ValueError(f"Invalid Flutter package name: {name!r}; use lowercase snake_case")
+    if root.exists() and not root.is_dir():
+        raise ValueError(f"Project path is not a directory: {root}")
+    if root.is_dir():
+        conflicts = sorted(p.name for p in root.iterdir()
+                           if p.name != ".git" and not
+                           (p.name == ".DS_Store" and p.is_file() and not p.is_symlink()))
+        if conflicts:
+            raise ValueError("Project directory is not empty; existing entries: " +
+                             ", ".join(repr(name) for name in conflicts) +
+                             ". Preserve existing files; use install.sh for an existing Flutter app.")
+    marker = root / ".git"
+    if not marker.exists() and not marker.is_symlink():
+        return False
+    if not marker.is_dir() or marker.is_symlink():
+        raise ValueError("Expected a normal Git repository (.git directory)")
+    try:
+        branch = subprocess.check_output(
+            ["git", "symbolic-ref", "--short", "HEAD"], cwd=root, text=True).strip()
+        tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=root)
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"], cwd=root)
+    except subprocess.CalledProcessError as exc:
+        raise ValueError("Cannot inspect existing Git repository; check that HEAD is on a branch") from exc
+    if branch != base:
+        raise ValueError(f"Git branch is {branch!r}; requested integration branch is {base!r}. Switch branches or pass the correct branch.")
+    if status:
+        raise ValueError("Git has staged or unstaged changes to tracked files. Review git status and commit or preserve those changes before initialization.")
+    if tracked:
+        raise ValueError("Git still tracks files in this repository. Initialization requires an empty tracked tree; use install.sh for an existing Flutter app.")
+    return True
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("path", type=Path)
@@ -21,20 +57,10 @@ def main():
     p.add_argument("base")
     a = p.parse_args()
     root = a.path.resolve()
-    if (root.exists() and (not root.is_dir() or any(x.name != ".git" for x in root.iterdir()))) or not re.fullmatch(r"[a-z][a-z0-9_]*", a.name):
-        p.error("Expected an empty directory or empty Git repository and snake_case project name")
-    existing_git = (root/".git").exists()
-    if existing_git:
-        if not (root/".git").is_dir() or (root/".git").is_symlink():
-            p.error("Expected a normal Git repository")
-        try:
-            branch = subprocess.check_output(["git","symbolic-ref","--short","HEAD"],cwd=root,text=True).strip()
-            tracked = subprocess.check_output(["git","ls-files","-z"],cwd=root)
-            status = subprocess.check_output(["git","status","--porcelain"],cwd=root)
-        except subprocess.CalledProcessError:
-            p.error("Invalid existing Git repository")
-        if branch != a.base or tracked or status:
-            p.error("Existing empty repository must be on the requested integration branch with no tracked files or pending changes")
+    try:
+        existing_git = validate_target(root, a.name, a.base)
+    except (ValueError, OSError) as exc:
+        p.error(str(exc))
     run("git","check-ref-format","--branch",a.base)
     platforms = "android,ios,web" if a.profile == "mobile-web" else "android,ios"
     run("flutter","create","--empty","--project-name",a.name,"--org",a.org,"--platforms",platforms,str(root))

@@ -13,7 +13,7 @@ START = "<!-- flutter-harness:start -->"
 END = "<!-- flutter-harness:end -->"
 BINS = ("harness.py","check.sh","check-runner.py","check-product.py","init-product.py","maestro.sh",
         "session-usage.py","validate-opencode.py","web-preview.py")
-IGNORES = ("/.flutter-harness/work/", "/.flutter-harness/previews/", "/.playwright/")
+IGNORES = ("/.flutter-harness/work/", "/.flutter-harness/previews/", "/.playwright/", ".DS_Store")
 # Known retired managed paths, never arbitrary project files.
 RETIRED = (".opencode/skills/flutter-harness/SKILL.md",
            ".flutter-harness/bin/verify-e2e.py", ".flutter-harness/bin/verify-pr.sh",
