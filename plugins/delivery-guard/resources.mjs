@@ -76,8 +76,8 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
       const state = await read(id);
       const active = await running(id,state);
       const pending = state.pending || [];
-      if (role === "worker" && active.filter(x=>x.role==="worker").length + pending.filter(x=>x.role==="worker").length >= 2)
-        throw Error("Harness: at most two active workers.");
+      if (!["reviewer","architect","advisor"].includes(role)) throw Error("Harness: one implementation agent; only read-only consultations allowed.");
+      if (active.length || pending.length) throw Error("Harness: wait for the current read-only consultation to finish.");
       if (role === "advisor") {
         if ((state.advisor || 0) >= 1) throw Error("Harness: advisor attempt budget exhausted.");
         state.advisor = (state.advisor || 0) + 1;

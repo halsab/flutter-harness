@@ -107,13 +107,13 @@ safe areas, responsive layout, semantics, and large-text support.
 For a substantial new screen, flow or redesign follow the compact DESIGN.md
 guide in .flutter-harness/templates/product/. Define the behavior first;
 choose a visual direction using relevant actual reference images and Material
-patterns before delegating or coding UI. For explicit redesigns inspect the
+patterns before coding UI. For explicit redesigns needing comparison inspect the
 populated baseline if available, compare two concise structural wireframes,
 and record the chosen direction, baseline defects and observable visual
 acceptance in the existing behavior contract. Preserve functionality, not
 an ineffective composition. Keep the selected direction and interaction
-notes in the task handoff. No mandatory mockup for ordinary UI
-changes, no separate design-review agent, no premium model for visual design.
+notes in the task handoff. No mandatory mockup or baseline for ordinary UI
+changes or new screens; user references are optional, no separate design-review agent, no premium model for visual design.
 
 ## Visual acceptance and review
 

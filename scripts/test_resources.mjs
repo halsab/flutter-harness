@@ -26,34 +26,28 @@ test("one advisor attempt is reserved even across concurrent requests", async()=
   const out=await Promise.allSettled([call("advisor"),call("advisor")]);
   assert.equal(out.filter(x=>x.status==="fulfilled").length,1);
   assert.equal(out.find(x=>x.status==="fulfilled").value.input.model,"openai/gpt-6.2-sol#medium");
-  await assert.rejects(call("advisor"),/budget exhausted/);
+  await assert.rejects(call("advisor"),/wait for the current/);
   await guard.clear("main");
   await call("advisor");
 });
-test("two reviewer attempts; actual workers bounded and tracked",async()=>{
-  const {call,finish,guard,sessions,advance}=await fixture();
-  await finish(await call("reviewer"),"r1");
-  advance();
-  await finish(await call("reviewer"),"r2");
-  advance();
-  await assert.rejects(call("reviewer"),/budget exhausted/);
-  const a=await call("worker"),b=await call("worker");
-  await assert.rejects(call("worker"),/two active workers/);
-  assert.match(await guard.status("main"),/dispatch/);
-  await finish(a,"w1","running");
-  await finish(b,"w2");
-  assert.match(await guard.status("main"),/completion/);
-  sessions.get("w1").outcome="succeeded";
-  assert.equal(await guard.status("main"),"");
-  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","w1","w2"]);
-});
-test("no nested advisor or explicit Sol implementation in tracked task",async()=>{
-  const {call}=await fixture();
+test("sequential read-only consultations and no workers",async()=>{
+  const {call,finish,guard}=await fixture();
+  await assert.rejects(call("worker"),/one implementation agent/);
+  await assert.rejects(call("general"),/one implementation agent/);
   await assert.rejects(call("advisor","nested"),/task parent/);
-  await assert.rejects(call("worker","main","openai/gpt-6.2-sol#high"),/reserved/);
-  await call("worker","main","openai/gpt-6-luna#low");
+  await assert.rejects(call("reviewer","main","openai/gpt-6.2-sol#high"),/reserved/);
+  const a=await call("architect");
+  await assert.rejects(call("reviewer"),/wait for the current/);
+  await finish(a,"a1","running");
+  await assert.rejects(call("advisor"),/wait for the current/);
+  assert.match(await guard.status("main"),/completion/);
 });
-
+test("two substantive reviews remain bounded",async()=>{
+  const {call,finish,advance}=await fixture();
+  await finish(await call("reviewer"),"r1");
+  advance(); await finish(await call("reviewer"),"r2");
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+});
 test("missing evidence spends no review; changed evidence after BLOCKED allows bounded recovery",async()=>{
   const {call,finish,guard,sessions,advance,setReady}=await fixture();
   setReady(false); await assert.rejects(call("reviewer"),/missing evidence/);

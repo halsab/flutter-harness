@@ -92,7 +92,7 @@
       ]
     },
     "reviewer": {
-      "description": "Perform ONE independent read-only review of the entire task diff and new task files. Use separate allowed Git commands (status, merge-base, diff) without shell chaining or substitution; use read for files. If full diff cannot be inspected, report OPEN, not PASSED. Findings need file, failure scenario, impact and evidence; no edits or repeated full reviews. For material UX changes open only the supplied actual runtime screenshots; compare to the task baseline if comparable. For focused tasks review the requested change and concrete regressions, not unrelated redesign preferences. If no baseline, never infer changes from historical images; judge current behavior and exact diff. Challenge superficial broad redesigns. Give VISUAL: PASS immediately before VERDICT: PASS only if visual acceptance is supported. For product defects report CHANGES_REQUIRED; for missing/unreadable evidence report BLOCKED, for technical failure ERROR. Use standard Material 3 component selection and visible selected state as material acceptance criteria. Static concepts are not runtime evidence.",
+      "description": "Perform ONE independent read-only review of the entire task diff and new task files. Use separate allowed Git commands (status, merge-base, diff) without shell chaining or substitution; use read for files. If full diff cannot be inspected, report OPEN, not PASSED. Findings need file, failure scenario, impact and evidence; no edits or repeated full reviews. For material UX changes open only the supplied actual runtime screenshots; compare to the task baseline if comparable. For focused tasks review the requested change and concrete regressions, not unrelated redesign preferences. Baseline is optional. Judge focused changes and new screens against request, actual result, supplied references if any and exact diff. Never infer before/after changes from historical images. Challenge superficial broad redesigns. Give VISUAL: PASS immediately before VERDICT: PASS only if visual acceptance is supported. For product defects report CHANGES_REQUIRED; for missing/unreadable evidence report BLOCKED, for technical failure ERROR. Use standard Material 3 component selection and visible selected state as material acceptance criteria. Static concepts are not runtime evidence.",
       "mode": "subagent",
       "model": "openai/gpt-6-luna#medium",
       "permissions": [
@@ -187,83 +187,6 @@
     },
     "summary": {
       "model": "openai/gpt-6-luna#low"
-    },
-    "worker": {
-      "description": "Implement ONE small, well-specified source/test slice with stable contracts. Edit only the assigned exact files, return a concise result and suggested targeted check. No shell/builds, Git publication, contract changes, additional agents or user questions; report conflicts to parent. Parent runs checks and integrates.",
-      "mode": "subagent",
-      "model": "openai/gpt-6-luna#low",
-      "permissions": [
-        {
-          "action": "shell",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "subagent",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "question",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "external_directory",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "browser",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "dart_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "maestro_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "playwright_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "chrome-devtools_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "xcode_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "xcodebuild_*",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "generate_image",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "webfetch",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "websearch",
-          "resource": "*",
-          "effect": "deny"
-        }
-      ]
     },
     "advisor": {
       "description": "Optional focused architectural decision consultant. Sol Medium, at most one call per original task, only for a consequential difficult decision with a self-contained compact evidence packet. Compare viable options, side effects, invariants, decision and verification; return a concise answer or identify missing evidence. Never scan the repository, implement, run commands, delegate, review the whole task or request user input. Return control to Luna.",
@@ -421,11 +344,6 @@
       "action": "external_directory",
       "resource": "*",
       "effect": "ask"
-    },
-    {
-      "action": "shell",
-      "resource": "python3 .flutter-harness/bin/workspace.py *",
-      "effect": "deny"
     },
     {
       "action": "shell",

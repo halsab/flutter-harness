@@ -14,7 +14,6 @@ ROLES = {
     "plan": f"{LUNA}#high",
     "architect": f"{LUNA}#high",
     "advisor": f"{SOL}#medium",
-    "worker": f"{LUNA}#low",
     "reviewer": f"{LUNA}#medium",
     "general": f"{LUNA}#medium",
     "explore": f"{LUNA}#low",
@@ -88,16 +87,12 @@ def validate(filename, profile):
         ensure(REVIEW_READONLY <= subagent_rules, f"{name} isn't read-only")
         allowed_shell = {rule for rule in subagent_rules if rule[0] == "shell" and rule[2] == "allow"}
         ensure(allowed_shell <= REVIEW_READONLY, f"{name} permits unexpected shell commands")
-    worker = agents["worker"]
-    ensure(worker.get("mode") == "subagent", "worker must be a subagent")
-    worker_rules = ruleset(worker.get("permissions"))
-    for action in ("shell", "subagent", "question", "external_directory", "browser", "dart_*", "maestro_*", "playwright_*", "chrome-devtools_*", "xcode_*", "xcodebuild_*", "generate_image", "webfetch", "websearch"):
-        ensure((action, "*", "deny") in worker_rules, f"worker must deny {action}")
-    ensure(not any(effect == "allow" for _, _, effect in worker_rules), "worker must not override its restrictions")
     advisor = agents["advisor"]
     ensure(advisor.get("mode") == "subagent", "advisor must be a subagent")
     advisor_rules = ruleset(advisor.get("permissions"))
-    ensure(worker_rules <= advisor_rules, "advisor must inherit worker restrictions")
+    for action in ("shell","subagent","question","external_directory","browser","dart_*","maestro_*","playwright_*","chrome-devtools_*","xcode_*","xcodebuild_*","generate_image","webfetch","websearch"):
+        ensure((action,"*","deny") in advisor_rules, f"advisor must deny {action}")
+    ensure("worker" not in agents, "Parallel implementation worker must not be configured")
     for action in ("edit", "read", "grep", "glob", "list", "skill"):
         ensure((action, "*", "deny") in advisor_rules, f"advisor must deny {action}")
     ensure(not any(effect == "allow" for _, _, effect in advisor_rules), "advisor must not override restrictions")

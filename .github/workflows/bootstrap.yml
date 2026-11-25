@@ -62,4 +62,8 @@ jobs:
           git config --global user.email harness@example.invalid
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
+          git init -q -b main "$tmp/app"
+          git -C "$tmp/app" remote add origin https://github.com/example/starter.git
           python3 scripts/new-project.py "$tmp/app" harness_product_smoke dev.harness mobile-web main
+          test "$(git -C "$tmp/app" remote get-url origin)" = "https://github.com/example/starter.git"
+          test "$(git -C "$tmp/app" branch --show-current)" = main
