@@ -106,6 +106,8 @@ def validate(filename, profile):
                    for action, resource, _ in ruleset(global_rules)),
            "Harness workflow permissions must not apply to non-Build agents")
     ensure(("shell", "git worktree *", "deny") in ruleset(build_rules), "Build must use ordinary branches")
+    ensure(("shell", "python3 .flutter-harness/bin/harness.py deliver", "deny") in ruleset(global_rules),
+           "non-Build agents must not bypass delivery gates")
     effective_rules = global_rules + build_rules
     ensure(REQUIRED_SAFETY <= ruleset(effective_rules), "missing safety permissions")
     for action, resource, expected in REQUIRED_SAFETY:
