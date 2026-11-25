@@ -217,7 +217,7 @@ def begin(root, c, name):
             return
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
-        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
             (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
@@ -666,7 +666,7 @@ def visual_preflight(root,c,only=None):
     raise Blocked("No capture-capable selected runtime target")
 
 
-def launch_auto(root,c,only=None,fresh=False):
+def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
     """First successful launch pins the task target. No silent platform switch
     after baseline, no boot/install/reset of devices, no all-platform build."""
     pin = pinned_target(root)
@@ -710,6 +710,8 @@ def launch_auto(root,c,only=None,fresh=False):
         atomic_json(work(root)/"runtime-selection.json",{"branch":text(git(root,"branch","--show-current")),
                     "platform":platform,"device":target})
         output(**result)
+        if baseline and digest==task.get("baseline_digest"):
+            capture_baseline(root,task,platform)
         return
     output(**save_preflight(root,[],unavailable))
     raise Blocked("Pinned runtime failed; preserve comparable evidence and diagnose it" if pin else
@@ -757,7 +759,28 @@ def launch(root, c, platform, device, *, preprobed=False, emit=True):
     return result
 
 
-def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None):
+def capture_baseline(root,task,platform):
+    """Record the original candidate while it is actually launched, before edits."""
+    require(fingerprint(root)==task["baseline_digest"],"Cannot capture baseline after source edits")
+    target=work(root)/"baseline.json"
+    runtime=read_json(work(root)/"runtime.json")
+    if target.is_file():
+        try:
+            before=read_json(target)
+            image=root/".flutter-harness/previews"/task["baseline_digest"]/("baseline-"+platform+"-light.png")
+            meta=read_json(image.with_suffix(".json"))
+            if (before.get("branch")==task["branch"] and before.get("digest")==task["baseline_digest"]
+                and meta.get("target")==runtime["device"] and meta.get("sha256")==hashlib.sha256(image.read_bytes()).hexdigest()):
+                return before
+        except (OSError,ValueError,KeyError,Blocked):
+            pass
+    capture(root,platform,"baseline","light","390,844")
+    value={"branch":task["branch"],"digest":task["baseline_digest"],"label":"baseline","platform":platform}
+    atomic_json(target,value)
+    return value
+
+
+def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None, *, fixture=None):
     require(re.fullmatch(r"[a-zA-Z0-9_-]+", label), "Invalid capture label")
     require(0.5 <= settle <= 5, "Settle must be between 0.5 and 5 seconds")
     current = read_json(work(root) / "runtime.json")
@@ -768,11 +791,13 @@ def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None):
     directory = root / ".flutter-harness/previews" / digest
     directory.mkdir(parents=True, exist_ok=True)
     image = directory / (label + "-" + platform + "-" + theme + ".png")
+    scenario_hash = None
     if scenario:
         path = Path(scenario)
         require(not path.is_absolute() and ".." not in path.parts and
                 (root / path).is_file() and not (root / path).is_symlink(),
                 "Capture scenario must be a project-local file")
+        scenario_hash=hashlib.sha256((root/path).read_bytes()).hexdigest()
     with target_lock(platform, device):
         image.with_suffix(".json").unlink(missing_ok=True)
         image.unlink(missing_ok=True)
@@ -809,16 +834,17 @@ def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None):
         data = image.read_bytes()
         size = png_size(data)
         require(fingerprint(root) == digest, "Stale capture")
+        require(not scenario or hashlib.sha256((root/scenario).read_bytes()).hexdigest()==scenario_hash,"Capture scenario changed during execution")
         require(read_json(work(root) / "runtime.json") == current, "Runtime target changed during capture")
         atomic_json(image.with_suffix(".json"), {"digest": digest, "label": label, "platform": platform,
                     "target": device, "theme": theme, "viewport": viewport if platform == "web" else None,
-                    "size": size, "scenario": scenario, "sha256": hashlib.sha256(data).hexdigest(),
+                    "size": size, "scenario": scenario, "scenario_sha256":scenario_hash, "fixture":fixture, "sha256": hashlib.sha256(data).hexdigest(),
                     "path": str(image)})
     event(root, "visual-captured", platform=platform, label=label, theme=theme, digest=digest)
     output(status="CAPTURED", path=str(image), digest=digest)
 
 
-def capture_plan(root,c):
+def capture_plan(root,c,refresh=()):
     """Execute an explicit, project-specific scripted plan, serially.
     No guessed taps, no destructive fixture creation, no model calls."""
     plan = read_json(work(root)/"visual-plan.json")
@@ -846,11 +872,28 @@ def capture_plan(root,c):
     runtime = read_json(work(root)/"runtime.json")
     require(runtime.get("digest")==digest and runtime.get("platform")==platform,
             "Run launch auto for checked candidate before capture-plan")
+    require(set(refresh)<=labels,"Unknown capture label in --refresh")
     for item in items:
         for theme in ("light","dark"):
+            image=root/".flutter-harness/previews"/digest/(item["label"]+"-"+platform+"-"+theme+".png")
+            expected={"digest":digest,"label":item["label"],"platform":platform,"theme":theme,"target":runtime["device"],
+                      "viewport":item.get("viewport") if platform=="web" else None,"scenario":item["scenario"],
+                      "fixture":plan.get("fixture"),"scenario_sha256":hashlib.sha256((root/item["scenario"]).read_bytes()).hexdigest()}
+            if item["label"] not in refresh and reusable_capture(image,expected):
+                event(root,"visual-reused",platform=platform,label=item["label"],theme=theme,digest=digest)
+                continue
             capture(root,platform,item["label"],theme,item.get("viewport") or "390,844",
-                    scenario=item["scenario"])
+                    scenario=item["scenario"],fixture=plan.get("fixture"))
     visual_evidence(root,any(x["kind"]=="interaction" for x in items))
+
+
+def reusable_capture(image,expected):
+    try:
+        data=image.read_bytes()
+        meta=read_json(image.with_suffix(".json"))
+        return all(meta.get(k)==v for k,v in expected.items()) and meta.get("size")==png_size(data) and meta.get("sha256")==hashlib.sha256(data).hexdigest()
+    except (OSError,ValueError,KeyError,Blocked):
+        return False
 
 
 def visual_evidence(root, require_interaction=False, *, emit=True):
@@ -865,6 +908,10 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
     require(platform in ("android", "ios", "web"), "Visual plan needs one representative platform")
     require(isinstance(plan.get("fixture"), str) and plan["fixture"].strip(), "Describe representative isolated fixture data")
     baseline = plan.get("baseline")
+    if baseline is None and (work(root)/"baseline.json").is_file():
+        before=read_json(work(root)/"baseline.json")
+        baseline={"digest":before["digest"],"label":before["label"]}
+        plan={**plan,"baseline":baseline}
     require(isinstance(baseline, dict), "Declare baseline digest/label or unavailable reason")
     preflight_path = work(root) / "visual-preflight.json"
     require(preflight_path.is_file(), "Run launch auto (or doctor visual) before runtime work")
@@ -910,6 +957,10 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
                     f"Stale or invalid capture: {path.name}")
             require("scenario" not in item or receipt.get("scenario")==item["scenario"],
                     "Capture scenario differs from planned state: "+path.name)
+            if item.get("scenario"):
+                scenario=Path(item["scenario"])
+                require(not scenario.is_absolute() and ".." not in scenario.parts and (root/scenario).is_file() and not (root/scenario).is_symlink(),"Invalid visual scenario")
+                require(receipt.get("scenario_sha256")==hashlib.sha256((root/scenario).read_bytes()).hexdigest(),"Capture scenario content changed: "+path.name)
             require(platform != "web" or item["kind"] != "interaction" or receipt.get("scenario"),
                     "Web interaction capture needs a Playwright scenario; a fresh-page screenshot is insufficient")
             targets.add(receipt["target"])
@@ -1033,7 +1084,7 @@ def diagnostics(root, sessions, *, local_only=False):
         else:
             events=events[-100:]
     for name in ("check.json","check-attempt.json","delivery-state.json","delivery-result.json","sessions.json",
-                 "runtime.json","runtime-selection.json","task.json","visual-preflight.json"):
+                 "runtime.json","runtime-selection.json","task.json","visual-preflight.json","baseline.json"):
         candidate=directory/name
         if candidate.is_file():
             try:
@@ -1091,7 +1142,8 @@ def main():
     p.add_argument("branch")
     for cmd in ("check","ci","deliver","verify","completion","status","fingerprint","stop-preview","adopt"):
         sub.add_parser(cmd)
-    sub.add_parser("capture-plan")
+    p = sub.add_parser("capture-plan")
+    p.add_argument("--refresh",action="append",default=[],help="Recapture both themes of an explicitly changed UI state")
     sub.add_parser("validate-delivery")
     p = sub.add_parser("prepare-delivery")
     p.add_argument("--message", required=True)
@@ -1172,7 +1224,7 @@ def main():
             digest = fingerprint(root)
             output(branch=text(git(root,"branch","--show-current")),
                    base=c["integration_branch"], revision=c.get("revision"), changed=dirty(root), digest=digest,
-                   checked=receipt.exists() and read_json(receipt).get("digest")==digest)
+                   checked=receipt.exists() and read_json(receipt).get("status")=="PASS" and read_json(receipt).get("digest")==digest)
         elif a.command == "scaffold":
             scaffold(root, a.name, a.layers)
         elif a.command == "adopt":
@@ -1180,7 +1232,7 @@ def main():
         elif a.command == "launch":
             if a.platform == "auto":
                 require(a.device is None,"Use HARNESS_IOS_DEVICE/HARNESS_ANDROID_DEVICE for preference")
-                launch_auto(root,c,a.only,a.fresh)
+                launch_auto(root,c,a.only,a.fresh,baseline=True)
             else:
                 require(a.only is None and not a.fresh,"--only and --fresh are for launch auto")
                 launch(root,c,a.platform,a.device)
@@ -1190,7 +1242,7 @@ def main():
             delivery_manifest(root,c)
             output(status="PASS")
         elif a.command == "capture-plan":
-            capture_plan(root,c)
+            capture_plan(root,c,a.refresh)
         elif a.command == "capture":
             capture(root, a.platform, a.label, a.theme, a.viewport, a.settle, a.scenario)
         elif a.command == "visual-evidence":

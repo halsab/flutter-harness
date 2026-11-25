@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { registerResourceGuard } from "../plugins/delivery-guard/resources.mjs";
-import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel } from "../plugins/delivery-guard/quality.mjs";
+import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel, resolvedDispute } from "../plugins/delivery-guard/quality.mjs";
 
 test("risk detection follows actual repository changes, not routine UI wording", () => {
   assert.ok(classify(["lib/data/task_repository.dart"], "routine UI change").length);
@@ -254,4 +254,11 @@ test("focused visual review uses Medium but structural and broad work remains Hi
   assert.equal(reviewEffort({files:2,lines:110},["material UI redesign or design-system change"]),"medium");
   assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"high");
   assert.equal(reviewEffort({files:1,lines:20},["persistent data, storage or sensitive operation changed"]),"high");
+});
+
+test("disputed acceptance requires explicit resolution of prior findings",()=>{
+ const m=text=>[{type:"assistant",content:[{type:"text",text}]}];
+ assert.equal(resolvedDispute(m("VISUAL: PASS\nVERDICT: PASS")),false);
+ assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVISUAL: PASS\nVERDICT: PASS")),true);
+ assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVERDICT: CHANGES_REQUIRED")),false);
 });

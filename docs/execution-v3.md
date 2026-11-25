@@ -36,3 +36,7 @@ Prefer a foreground Python supervisor driving bounded OpenCode runs via document
 ## Required regression cases
 
 A failing test stops before a hanging later test; hung process is bounded and not PASS. A duplicate check cannot invalidate an active one. A missing session export still writes local diagnostics. An unrelated baseline hash is rejected. Later stages must add executable controller and adapter tests before any production cutover.
+
+## Release decision
+
+Do not hold practical development for a speculative external supervisor. Ship the hardened existing CLI and guard first. A full external controller remains a future option only if actual production use demonstrates a need; it is not implemented or required for this release. Existing OpenCode background completion is observed in Lab logs. Keep exact current receipt and owner approval, automatic original capture, bounded review adjudication, and reuse of valid scripted evidence. A real local smoke check remains necessary; CI mocks do not prove OpenCode plugin runtime or UI appearance.

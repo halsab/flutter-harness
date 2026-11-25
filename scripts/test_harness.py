@@ -125,6 +125,28 @@ class Lifecycle(unittest.TestCase):
             h.launch_auto(self.root,self.c,fresh=True)
             launch.assert_called_once()
 
+    def test_baseline_captured_before_source_edit(self):
+        task=h.read_json(h.work(self.root)/"task.json")
+        h.atomic_json(h.work(self.root)/"runtime.json",{"digest":task["baseline_digest"],"platform":"ios","device":"phone"})
+        with patch.object(h,"capture") as cap:
+            value=h.capture_baseline(self.root,task,"ios")
+            cap.assert_called_once_with(self.root,"ios","baseline","light","390,844")
+            self.assertEqual(value["digest"],task["baseline_digest"])
+            self.write("lib/main.dart","changed")
+            with self.assertRaisesRegex(h.Blocked,"after source edits"):
+                h.capture_baseline(self.root,task,"ios")
+
+    def test_capture_reuse_requires_exact_image_and_scenario(self):
+        p=self.write(".flutter-harness/work/capture.png","")
+        data=h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"
+        p.write_bytes(data)
+        expected={"scenario_sha256":"abc","digest":"candidate"}
+        h.atomic_json(p.with_suffix(".json"),{**expected,"size":[390,844],"sha256":hashlib.sha256(data).hexdigest()})
+        self.assertTrue(h.reusable_capture(p,expected))
+        self.assertFalse(h.reusable_capture(p,{**expected,"scenario_sha256":"other"}))
+        p.write_bytes(data+b"x")
+        self.assertFalse(h.reusable_capture(p,expected))
+
     def test_capture_plan_runs_scripted_states_serially(self):
         self.write("maestro/screen.yaml","appId: dev.test\n---\n- launchApp\n")
         self.write("maestro/menu.yaml","appId: dev.test\n---\n- launchApp\n")
