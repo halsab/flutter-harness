@@ -59,3 +59,13 @@ Use `mobile` for Android/iOS only, or `mobile-web` to include Web. Replace
 directory, select Build / Luna Medium and give one product task. The agent
 handles branch, checks, relevant review and PR creation; you approve
 publication and merge. No initial screenshot unless comparison is needed.
+
+### Agent scope
+
+Harness instructions, revision checks, task tracking, recovery, and quality/resource
+hooks apply only to the root `build` agent. Select Plan, Ask, Review, or any
+other configured agent for ordinary conversation, planning, and independent
+analysis without starting or completing a Harness task. Switching away from
+Build suspends its task hooks; switching back resumes the existing task.
+Build-specific workflow permissions are scoped to Build. Shared repository
+publication safeguards and location-level plugin/MCP settings remain in force.
