@@ -358,7 +358,7 @@ def deliver(root, c):
     require(receipt.get("status") == "PASS" and receipt.get("digest") == digest,
             "Missing/stale standard check receipt; run check")
     manifest = read_json(work(root) / "delivery.json")
-    visual = visual_evidence(root,manifest.get("visual_interaction") is True,emit=False) if manifest.get("visual_required") is True else None
+    visual = visual_evidence(root,manifest.get("visual_interaction") is True,emit=False) if manifest.get("visual_required") is True or manifest.get("visual_interaction") is True else None
     required_e2e = manifest.get("required_e2e", [])
     require(isinstance(required_e2e, list) and all(p in ("android", "ios", "web") for p in required_e2e), "Invalid required_e2e")
     for platform in required_e2e:
