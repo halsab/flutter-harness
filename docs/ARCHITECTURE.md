@@ -28,5 +28,6 @@ No default skill, MCP or custom context summarizer. Use OpenCode's search,
 context and model routing; load only the relevant canonical product guide.
 No automatic multi-agent dispatcher for ordinary work. Explicit complex
 work may use the graph helper for dependencies and file conflicts; actual
-child completion and integrated acceptance are separate. Do not turn
+child completion is observed by the resource guard; delivery waits for it.
+Integrated acceptance is separate. Do not turn
 abstract graph declarations into a false delivery guarantee.

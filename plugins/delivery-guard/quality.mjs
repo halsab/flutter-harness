@@ -138,7 +138,7 @@ export async function candidate(root, base, request, failedNames = []) {
 // assertion or a marker file. Ordinary tasks do not launch another model.
 export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual = async () => {
   await exec("python3", [join(root, ".flutter-harness/bin/harness.py"), "visual-evidence"], {cwd:root, timeout:60000});
-}) {
+}, childStatus = async () => "") {
   const key = (id) => "quality/" + id;
   const pending = (id, call) => "quality-call/" + id + "/" + call;
   async function readState(id) { return (await ctx.storage.get(key(id))) || {}; }
@@ -170,7 +170,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     const check = checked ? "passed" : v.state.lastCheckFailed ? "failed" : "missing";
     const approvedReview = checked && v.change.reasons.length > 0 &&
       await approved(id, v.state, v.change);
-    let why = gateReason(v.change, v.state, approvedReview);
+    let why = await childStatus(id) || gateReason(v.change, v.state, approvedReview);
     if (checked && v.change.reasons.includes(visualRisk)) {
       try { await verifyVisual(); }
       catch { why = "Current candidate needs actual light/dark runtime capture evidence (CLI launch/capture)."; }

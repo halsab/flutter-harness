@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { snapshot, inspect, taskIntent, recovery } from "./guard.mjs";
 import { registerQualityGate } from "./quality.mjs";
@@ -16,7 +16,7 @@ export default Plugin.define({
     const base = config.integration_branch;
     const key = (id) => "task/" + id;
     const resources = await registerResourceGuard(ctx, key);
-    const quality = await registerQualityGate(ctx, root, "origin/" + base, key);
+    const quality = await registerQualityGate(ctx, root, "origin/" + base, key, undefined, resources.status);
     await ctx.session.hook("prompt", async (event) => {
       const session = await ctx.session.get({ sessionID: event.sessionID });
       if (session.parentID) return;
@@ -40,6 +40,11 @@ export default Plugin.define({
       const result = await inspect(root, base, state.baseline, state.intent);
       const evidence = result.active ? await quality.status(id) : { issue: "", phase: "work" };
       if (!result.active || (result.passed && !evidence.issue)) {
+        if (result.active) {
+          const directory = join(root, ".flutter-harness/work");
+          await mkdir(directory, {recursive:true});
+          await writeFile(join(directory,"sessions.json"), JSON.stringify({sessions:await resources.sessions(id)}));
+        }
         await ctx.storage.remove(key(id));
         await quality.clear(id);
         await resources.clear(id);

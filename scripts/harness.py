@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic Flutter lifecycle; no model calls or shell interpolation."""
 import argparse
+import csv
 import hashlib
 import json
 import os
@@ -189,11 +190,20 @@ def check(root, c):
     run(root, "flutter", "pub", "get", log=work(root) / "pub-get.log")
     run(root, "dart", "format", "lib", "test", log=work(root) / "format.log")
     before = fingerprint(root)
-    # Keep runner stdout visible for the OpenCode quality hook.
-    run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"])
+    # Unique artifact directory prevents collisions between runs/checkouts.
+    artifact_dir = Path(tempfile.mkdtemp(prefix="standard-", dir=work(root)))
+    environment = dict(os.environ, HARNESS_ARTIFACTS_DIR=str(artifact_dir))
+    # Keep short runner stdout visible for the OpenCode quality hook.
+    run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"], env=environment, timeout=2400)
     require(fingerprint(root) == before, "Check inputs changed during verification")
-    atomic_json(receipt, {"digest": before, "status": "PASS",
-                          "checked_at": int(time.time())})
+    reports = list(artifact_dir.glob("check-*.tsv"))
+    require(len(reports) == 1, "Missing unique runner report")
+    with reports[0].open() as f:
+        checks = list(csv.DictReader(f, delimiter="\t"))
+    require({r.get("check") for r in checks if r.get("status")=="PASS"} ==
+            {"format","product","analyze","flutter-tests"}, "Incomplete standard runner evidence")
+    atomic_json(receipt, {"digest": before, "status": "PASS", "checks":checks,
+                          "report":str(reports[0]), "checked_at": int(time.time())})
     output(status="PASS", digest=before, receipt=str(receipt))
 
 
@@ -298,7 +308,10 @@ def deliver(root, c):
             "No task change to publish")
     git(root, "push", "-u", "origin", "HEAD:refs/heads/" + name)
     body = work(root) / "pr-body.md"
-    body.write_text(manifest["body"], encoding="utf-8")
+    summary = ["", "", "## Harness evidence (generated)", f"- Candidate: {digest}", "- Standard check: PASS"]
+    for platform in required_e2e:
+        summary.append(f"- Required {platform} E2E: PASS")
+    body.write_text(manifest["body"].rstrip() + "\n".join(summary) + "\n", encoding="utf-8")
     if existing:
         run(root, "gh", "pr", "edit", str(existing["number"]), "--repo", repo,
             "--title", manifest["title"], "--body-file", str(body))
