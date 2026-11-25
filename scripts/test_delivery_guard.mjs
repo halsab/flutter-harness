@@ -85,3 +85,52 @@ test("visual progress participates in recovery; exhausted budget stops immediate
   assert.equal(recovery({attempts:1,lastRecovery:first.fingerprint},result,{...q,visualDigest:"two"}).stop,false);
   assert.equal(recovery({attempts:0},result,{...q,phase:"blocked"}).stop,true);
 });
+
+test("Build-only hook scope follows the live selected agent and excludes children", async () => {
+  const {buildOnly} = await import("../plugins/delivery-guard/scope.mjs");
+  const sessions = new Map();
+  const hooks = new Map();
+  const domain = name => ({hook: async (event, callback) => hooks.set(name + "/" + event, callback)});
+  const raw = {
+    session: {...domain("session"), get: async ({sessionID}) => sessions.get(sessionID)},
+    tool: domain("tool"),
+    permission: domain("permission"),
+  };
+  const ctx = buildOnly(raw);
+  let calls = 0;
+  const handler = async event => { calls++; event.handled = true; };
+  for (const name of ["prompt","context","experimental.idle"]) await ctx.session.hook(name, handler);
+  for (const name of ["execute.before","execute.after"]) await ctx.tool.hook(name, handler);
+  await ctx.permission.hook("evaluate", handler);
+  const fire = async (expected) => {
+    for (const [name, hook] of hooks) {
+      const event = {sessionID:"s", tool:"subagent", action:"shell", effect:"allow"};
+      await hook(event);
+      assert.equal(Boolean(event.handled), expected, name);
+      assert.equal(event.effect, "allow");
+    }
+  };
+  for (const agent of ["plan", "ask", "review", "reviewer", "custom", undefined]) {
+    sessions.set("s",{agent});
+    await fire(false);
+  }
+  sessions.set("s",{agent:"build",parentID:"other"});
+  await fire(false);
+  assert.equal(calls,0);
+  sessions.set("s",{agent:"build"});
+  await fire(true);
+  assert.equal(calls,6);
+  // A previously active Build session may be switched to a conversational agent.
+  sessions.set("s",{agent:"plan"});
+  await fire(false);
+  assert.equal(calls,6);
+  sessions.set("s",{agent:"build"});
+  await fire(true);
+  assert.equal(calls,12);
+  const conflicting = {sessionID:"s",agent:"review"};
+  await hooks.get("session/context")(conflicting);
+  assert.equal(conflicting.handled,undefined);
+  const read = {sessionID:"s",tool:"read"};
+  await hooks.get("tool/execute.before")(read);
+  assert.equal(read.handled,undefined);
+});
