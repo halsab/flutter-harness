@@ -81,6 +81,43 @@ class Lifecycle(unittest.TestCase):
         with self.assertRaisesRegex(h.Blocked,"Managed Harness file differs"):
             h.installed_revision(self.root,self.c)
 
+    def test_duplicate_begin_keeps_task_receipt(self):
+        path = h.work(self.root)/"task.json"
+        before = path.read_bytes()
+        h.begin(self.root,self.c,"feature/test")
+        self.assertEqual(path.read_bytes(),before)
+
+    def test_changed_candidate_requires_check_before_runtime(self):
+        self.write("lib/main.dart","changed")
+        with patch.object(h,"probe_runtime") as probe:
+            with self.assertRaisesRegex(h.Blocked,"canonical check"):
+                h.launch_auto(self.root,self.c)
+            probe.assert_not_called()
+
+    def test_pinned_unchanged_runtime_reuses_prior_launch(self):
+        h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
+        h.atomic_json(h.work(self.root)/"runtime.json",{"platform":"ios","device":"phone","digest":h.fingerprint(self.root)})
+        with patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch") as launch:
+            h.launch_auto(self.root,self.c)
+            launch.assert_not_called()
+            launch.return_value={"status":"READY","platform":"ios","target":"phone"}
+            h.launch_auto(self.root,self.c,fresh=True)
+            launch.assert_called_once()
+
+    def test_prepare_delivery_defaults_and_early_validation(self):
+        self.write("lib/main.dart","new")
+        a = h.argparse.Namespace(message="change",title="Change",body="description",review=False,visual=False,interaction=True,e2e=[])
+        h.prepare_delivery(self.root,self.c,a)
+        m=h.delivery_manifest(self.root,self.c)
+        self.assertEqual(m["files"],["lib/main.dart"])
+        self.assertEqual(m["required_e2e"],[])
+        self.assertTrue(m["visual_required"])
+        self.assertTrue(m["visual_interaction"])
+        m["required_e2e"]="none"
+        h.atomic_json(h.work(self.root)/"delivery.json",m)
+        with self.assertRaisesRegex(h.Blocked,"Invalid required_e2e"):
+            h.delivery_manifest(self.root,self.c)
+
     def test_runtime_selection_stops_and_pins_successful_fallback(self):
         with patch.object(h,"runtime_targets",return_value=[("ios","phone"),("android","emu"),("web",None)]) as discovery, \
              patch.object(h,"probe_runtime",return_value=[390,844]) as probe, \

@@ -222,7 +222,7 @@ test("combined production hooks reserve no reviewer before evidence and bind act
     assert.equal(interaction,true);
     if(!ready)throw Error("missing menu");
     return {evidence_digest:visualDigest,captures:[{path:"menu.png"}]};
-  },resources.status,true,resources.reviewAvailability);
+  },resources.status,true,resources.reviewAvailability,async()=>{});
   const emit=async(n,e)=>{for(const f of hooks[n]) await f(e);};
   const review={tool:"subagent",sessionID:"main",id:"r",input:{agent:"reviewer",prompt:"Review"}};
   await assert.rejects(emit("execute.before",review),/standard check/);
@@ -239,4 +239,10 @@ test("combined production hooks reserve no reviewer before evidence and bind act
   assert.equal(await quality.reason("main"),"");
   visualDigest="two";
   assert.match(await quality.reason("main"),/reviewer verdict/);
+});
+
+test("focused visual review uses Medium but structural and broad work remains High",()=>{
+  assert.equal(reviewEffort({files:2,lines:110},["material UI redesign or design-system change"]),"medium");
+  assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"high");
+  assert.equal(reviewEffort({files:1,lines:20},["persistent data, storage or sensitive operation changed"]),"high");
 });
