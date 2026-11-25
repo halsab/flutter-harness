@@ -53,6 +53,7 @@ export default Plugin.define({
         attempts: 0,
       });
       await record(event.sessionID, "task-start");
+      await saveSessions(event.sessionID);
     });
     await ctx.session.hook("experimental.idle", async (event) => {
       const id = event.sessionID;

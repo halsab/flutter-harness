@@ -81,6 +81,23 @@ class Lifecycle(unittest.TestCase):
         with self.assertRaisesRegex(h.Blocked,"Managed Harness file differs"):
             h.installed_revision(self.root,self.c)
 
+    def test_diagnostics_without_session_export(self):
+        h.event(self.root,"task-start",session="ses_fixture")
+        h.event(self.root,"check-run",artifacts=".flutter-harness/work/standard-fixture")
+        self.write(".flutter-harness/work/standard-fixture/check-fixture.tsv","check\tstatus\texit_code\nflutter-tests\tTIMEOUT\t124\n")
+        with patch.object(h,"usage",side_effect=h.Blocked("export unavailable")):
+            h.diagnostics(self.root,[])
+        data=h.read_json(h.work(self.root)/"diagnostics.json")
+        self.assertEqual(data["usage_status"],"UNAVAILABLE")
+        self.assertEqual(data["standard_runs"][0]["checks"][0]["status"],"TIMEOUT")
+        self.assertFalse(data["check_running"])
+
+    def test_check_cannot_run_concurrently(self):
+        with (h.work(self.root)/"check.lock").open("a") as lock:
+            h.fcntl.flock(lock,h.fcntl.LOCK_EX|h.fcntl.LOCK_NB)
+            with self.assertRaisesRegex(h.Blocked,"already running"):
+                h.check(self.root,self.c)
+
     def test_duplicate_begin_keeps_task_receipt(self):
         path = h.work(self.root)/"task.json"
         before = path.read_bytes()
@@ -274,6 +291,19 @@ class Lifecycle(unittest.TestCase):
             h.atomic_json(p.with_suffix(".json"),{"digest":digest,"label":label,"platform":"android","target":"emulator",
                 "theme":theme,"size":[390,844],"viewport":None,"sha256":hashlib.sha256(data).hexdigest()})
         return folder, write
+
+    def test_visual_rejects_unrelated_baseline(self):
+        self.write("lib/main.dart","new candidate")
+        folder,write=self.visual_fixture()
+        for label in ("final","menu"):
+            for theme in ("light","dark"):
+                write(label,theme,theme.encode())
+        path=h.work(self.root)/"visual-plan.json"
+        plan=h.read_json(path)
+        plan["baseline"]={"digest":"a"*64,"label":"baseline"}
+        h.atomic_json(path,plan)
+        with self.assertRaisesRegex(h.Blocked,"original candidate"):
+            h.visual_evidence(self.root,True)
 
     def test_visual_requires_current_complete_distinct_pairs(self):
         folder, write = self.visual_fixture()

@@ -217,7 +217,7 @@ def begin(root, c, name):
             return
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
-        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
             (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
@@ -258,20 +258,58 @@ def doctor(root, c, operation, only=None):
 
 
 def check(root, c):
+    folder = work(root)
+    folder.mkdir(parents=True,exist_ok=True)
+    # A second canonical check cannot erase a running check's receipt.
+    with (folder/"check.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise Blocked("Standard check already running; inspect check-attempt.json")
+        attempt = {"status":"RUNNING","branch":text(git(root,"branch","--show-current")),
+                   "revision":c["revision"],"started_at":int(time.time()*1000),"pid":os.getpid()}
+        path = folder/"check-attempt.json"
+        atomic_json(path,attempt)
+        try:
+            check_candidate(root,c,attempt)
+        except BaseException as exc:
+            attempt.update(status="INTERRUPTED" if isinstance(exc,(KeyboardInterrupt,SystemExit)) else "FAIL",
+                           error_type=type(exc).__name__,finished_at=int(time.time()*1000))
+            atomic_json(path,attempt)
+            raise
+        attempt.update(status="PASS",finished_at=int(time.time()*1000))
+        atomic_json(path,attempt)
+
+
+def check_candidate(root,c,attempt):
     receipt = work(root) / "check.json"
     receipt.unlink(missing_ok=True)
     event(root, "check-start")
     require((root / ".flutter-harness/product.json").is_file(), "Missing product policy configuration")
     logs = Path(tempfile.mkdtemp(prefix="prepare-", dir=work(root)))
-    run(root, "flutter", "pub", "get", log=logs / "pub-get.log")
-    run(root, "dart", "format", "lib", "test", log=logs / "format.log")
+    run(root, "flutter", "pub", "get", log=logs / "pub-get.log",timeout=120)
+    run(root, "dart", "format", "lib", "test", log=logs / "format.log",timeout=60)
     before = fingerprint(root)
     # Unique artifact directory prevents collisions between runs/checkouts.
     artifact_dir = Path(tempfile.mkdtemp(prefix="standard-", dir=work(root)))
     environment = dict(os.environ, HARNESS_ARTIFACTS_DIR=str(artifact_dir))
+    attempt.update(digest=before,artifacts=str(artifact_dir.relative_to(root)))
+    atomic_json(work(root)/"check-attempt.json",attempt)
     event(root, "check-run", artifacts=str(artifact_dir.relative_to(root)))
     # Keep short runner stdout visible for the OpenCode quality hook.
-    run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"], env=environment, timeout=2400)
+    try:
+        run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"], env=environment, timeout=2400)
+    except (Blocked,subprocess.TimeoutExpired):
+        reports=list(artifact_dir.glob("check-*.tsv"))
+        if len(reports)==1:
+            with reports[0].open(encoding="utf-8") as stream:
+                rows=list(csv.DictReader(stream,delimiter="\t"))
+            attempt["checks"]=rows
+            attempt["report"]=str(reports[0].relative_to(root))
+            failures=[r for r in rows if r.get("status")!="PASS"]
+            if failures:
+                event(root,"check-failed",check=failures[-1]["check"],status=failures[-1]["status"],exit=failures[-1]["exit_code"],report=attempt["report"])
+        raise
     require(fingerprint(root) == before, "Check inputs changed during verification")
     reports = list(artifact_dir.glob("check-*.tsv"))
     require(len(reports) == 1, "Missing unique runner report")
@@ -279,6 +317,8 @@ def check(root, c):
         checks = list(csv.DictReader(f, delimiter="\t"))
     require({r.get("check") for r in checks if r.get("status")=="PASS"} ==
             {"format","product","analyze","flutter-tests"}, "Incomplete standard runner evidence")
+    attempt["checks"]=checks
+    attempt["report"]=str(reports[0].relative_to(root))
     atomic_json(receipt, {"digest": before, "status": "PASS", "checks":checks,
                           "report":str(reports[0]), "checked_at": int(time.time())})
     event(root, "check-pass", digest=before)
@@ -890,6 +930,9 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
         label = baseline.get("label")
         require(isinstance(before,str) and re.fullmatch(r"[0-9a-f]{64}",before) and before != digest and
                 isinstance(label,str) and re.fullmatch(r"[a-zA-Z0-9_-]+",label), "Invalid baseline candidate/label")
+        task = read_json(work(root)/"task.json")
+        require(task.get("branch")==preflight.get("branch") and task.get("baseline_digest")==before,
+                "Baseline must match the original candidate of this task; do not use another task\'s screenshot")
         image = root / ".flutter-harness/previews" / before / (label+"-"+platform+"-light.png")
         require(image.is_file() and image.with_suffix(".json").is_file(), "Missing comparable baseline capture receipt")
         meta = read_json(image.with_suffix(".json"))
@@ -955,39 +998,81 @@ def usage(root, sessions, *, emit=True):
 
 
 def diagnostics(root, sessions):
-    """One safe, compact report; sanitized exports are temporary."""
-    summary = usage(root, sessions, emit=False)
-    data = {"harness":installed_revision(root,config(root)), "usage": summary, "artifacts": {}}
-    for name in ("check.json", "delivery-state.json", "delivery-result.json", "sessions.json", "runtime.json", "runtime-selection.json", "task.json"):
-        path = work(root) / name
-        if path.is_file():
-            data["artifacts"][name] = read_json(path)
-    path = work(root) / "lifecycle.jsonl"
+    """Always retain local evidence; usage export is best effort."""
+    directory = work(root)
+    errors = []
+    data = {"harness":None,"usage":None,"artifacts":{}}
+    try:
+        data["harness"]=installed_revision(root,config(root))
+    except (OSError,ValueError,KeyError,Blocked,subprocess.TimeoutExpired) as exc:
+        data["harness"]={"status":"BLOCKED","error_type":type(exc).__name__}
+        errors.append("Harness revision unavailable or inconsistent")
     events = []
+    path=directory/"lifecycle.jsonl"
     if path.is_file():
         for line in path.read_text(encoding="utf-8").splitlines():
-            item = json.loads(line)
-            if item.get("session") in sessions or any(
-                    start <= item.get("at", 0) <= end
-                    for start, end in summary["session_windows"]):
-                events.append(item)
-    data["events"] = events
-    # Preserve the actual status/exit of each standard check, including failed runs.
-    reports = []
+            try:
+                item=json.loads(line)
+                if isinstance(item,dict):
+                    events.append(item)
+            except ValueError:
+                errors.append("Unreadable lifecycle entry skipped")
+    # Most recent task boundary if no explicit session or durable session list.
+    if not sessions:
+        start=next((i for i in range(len(events)-1,-1,-1) if events[i].get("stage")=="task-start"),None)
+        if start is not None:
+            events=events[start:]
+            sessions=list(dict.fromkeys(x.get("session") for x in events if isinstance(x.get("session"),str)))
+        else:
+            events=events[-100:]
+    else:
+        start=next((i for i,x in enumerate(events) if x.get("stage")=="task-start" and x.get("session") in sessions),None)
+        events=events[start:] if start is not None else events[-100:]
+    for name in ("check.json","check-attempt.json","delivery-state.json","delivery-result.json","sessions.json",
+                 "runtime.json","runtime-selection.json","task.json","visual-preflight.json"):
+        candidate=directory/name
+        if candidate.is_file():
+            try:
+                data["artifacts"][name]=read_json(candidate)
+            except (OSError,ValueError,Blocked):
+                errors.append("Unreadable artifact: "+name)
+    # Report actual lock status, not a stale PID after a killed process.
+    directory.mkdir(parents=True,exist_ok=True)
+    with (directory/"check.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            data["check_running"]=False
+        except BlockingIOError:
+            data["check_running"]=True
+    data["events"]=events
+    reports=[]
     for item in events:
-        if item.get("stage") != "check-run":
+        if item.get("stage")!="check-run":
             continue
-        directory = (root / item.get("artifacts","")).resolve()
-        if work(root).resolve() not in directory.parents:
+        run_dir=(root/item.get("artifacts","")).resolve()
+        if directory.resolve() not in run_dir.parents:
             continue
-        for path in directory.glob("check-*.tsv"):
-            with path.open(encoding="utf-8") as stream:
-                reports.append({"report":str(path.relative_to(root)), "checks":list(csv.DictReader(stream,delimiter="\t"))})
-    data["standard_runs"] = reports
-    target = work(root) / "diagnostics.json"
-    atomic_json(target, data)
-    output(status="PASS", report=str(target))
-
+        for path in run_dir.glob("check-*.tsv"):
+            try:
+                with path.open(encoding="utf-8") as stream:
+                    reports.append({"report":str(path.relative_to(root)),"checks":list(csv.DictReader(stream,delimiter="\t"))})
+            except OSError:
+                errors.append("Unreadable standard report")
+    data["standard_runs"]=reports
+    data["errors"]=errors
+    target=directory/"diagnostics.json"
+    # Persist immediately, even if the session exporter subsequently hangs.
+    data["usage_status"]="PENDING" if sessions else "UNAVAILABLE"
+    atomic_json(target,data)
+    if sessions:
+        try:
+            data["usage"]=usage(root,sessions,emit=False)
+            data["usage_status"]="PASS"
+        except (OSError,ValueError,KeyError,Blocked,subprocess.TimeoutExpired) as exc:
+            data["usage_status"]="UNAVAILABLE"
+            errors.append("Sanitized OpenCode export unavailable: "+type(exc).__name__)
+    atomic_json(target,data)
+    output(status="PASS",report=str(target),usage_status=data["usage_status"])
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1042,6 +1127,15 @@ def main():
         require((root / "pubspec.yaml").is_file(), "Expected Flutter project")
         if a.command == "fingerprint":
             print(fingerprint(root))
+            return 0
+        if a.command=="diagnostics":
+            sessions=a.sessions
+            if not sessions:
+                try:
+                    sessions=read_json(work(root)/"sessions.json").get("sessions",[])
+                except (OSError,ValueError,Blocked):
+                    sessions=[]
+            diagnostics(root,sessions)
             return 0
         c = config(root)
         if a.command == "revision":
@@ -1099,13 +1193,10 @@ def main():
             run(root, sys.executable, str(HERE / "web-preview.py"), "stop")
         elif a.command == "e2e":
             e2e(root, a.platform, a.scenario, a.device)
-        elif a.command in ("usage", "diagnostics"):
+        elif a.command == "usage":
             sessions = a.sessions or read_json(work(root)/"sessions.json")["sessions"]
             require(sessions, "No recorded sessions")
-            if a.command == "diagnostics":
-                diagnostics(root, sessions)
-            else:
-                usage(root, sessions)
+            usage(root, sessions)
         return 0
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
         if a.command in ("begin", "check", "deliver", "doctor", "launch", "capture", "capture-plan", "prepare-delivery", "validate-delivery", "visual-evidence", "e2e"):
