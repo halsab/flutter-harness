@@ -114,51 +114,48 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 
 <!-- flutter-harness:start -->
 ## Flutter Harness
-Read .flutter-harness/config.json and product.json for the profile and adoption status.
-For an isolated fix or routine feature in an active product, use this compact
-workflow directly. Load the flutter-harness skill for pending/unknown adoption,
-substantial UI/architecture changes, interacting behavior, high risk, complex
-multi-slice work or difficult recovery. If uncertain, load the skill.
-Read .flutter-harness/PRODUCT.md before foundation adoption or meaningful
-UI/architecture changes; preserve the adopted baseline on other tasks.
-Default: feature-first MVVM, Material 3, Flutter Web; never disable the guard.
+Read .flutter-harness/config.json and .flutter-harness/product.json.
+In an active product, use this workflow for isolated fixes/routine features.
+Load the flutter-harness skill for pending/unknown adoption, interacting
+behavior, substantial UI/architecture work, high risk, multi-slice work
+or difficult recovery. If uncertain, load it. Read .flutter-harness/PRODUCT.md
+before adoption or meaningful UI/architecture changes; preserve the adopted
+baseline. Default feature-first MVVM, Material 3, Flutter Web. Never disable
+the product guard. Avoid reloading unchanged context.
 
-Implement the user outcome; ask only material product/security questions.
-Fetch the integration base (app in Lab), work on a feature branch, preserve
-unrelated changes and stage only task files. Default Luna Medium; no routine
-subagents. For material changed behavior use the compact BEHAVIOR.md guide
-under .flutter-harness/templates/product/ before code. Load DESIGN.md for
-substantial visual work and ORCHESTRATION.md for complex multi-slice work.
-Luna High plans/diagnoses complex work, Low handles bounded slices; one parent
-owns delivery. Optional Sol Medium advisor only as specified in ORCHESTRATION.md;
-no automatic escalation or premium implementation.
+Implement the requested outcome; ask only material product/security questions.
+Fetch the integration base (app in Lab); work on a feature branch, preserve
+unrelated edits and stage only task files. Luna Medium by default; no routine
+subagents. For material changed behavior read the BEHAVIOR.md guide in
+.flutter-harness/templates/product/ before code; for substantial visual work
+read DESIGN.md; for complex work read ORCHESTRATION.md. Follow its Luna
+High planning/diagnosis, Low worker and optional single Sol Medium advisor
+rules. One parent owns delivery; no automatic premium escalation.
 
-Inspect the task diff once before final checks. Match meaningful new behavior
-to a focused unit/widget assertion; reuse adequate existing tests. No tests
-for trivial labels/styling or quotas; never delete a failing acceptance test
-to get green CI. Format touched Dart files, run one standard check:
+Inspect the task diff once before final checks; match meaningful new behavior
+to focused unit/widget assertions, reusing adequate tests. Never remove a
+failing acceptance test to get green CI. No trivial-label/styling tests or
+coverage quotas. Format touched Dart files; run one standard check:
 bash .flutter-harness/bin/check.sh . standard PROFILE
-Replace PROFILE with the installed profile. Reuse evidence on unchanged
-candidates; diagnose the first real failure and make a changed attempt,
-not a blind rerun. Keep main.dart focused on bootstrap, reuse the design system.
+Use the installed profile. Reuse evidence on unchanged candidates; fix the
+first actual failure before rerunning. Keep main.dart focused on bootstrap.
 
-Use independent read-only review for interacting behavior, persistent-data
+Require independent review for interacting behavior, persistent-data
 mutations, destructive changes, security, migration, concurrency, substantial
-UI/design-system/architecture changes, large diffs or explicit request.
-Follow plugin risk/effort and same-candidate review/check requirements.
-Material UX changes require actual runtime visual inspection per PRODUCT.md.
-Device/browser E2E only for actual platform/critical risk or explicit request;
-use scripted assertions with known initial state and exact postconditions.
-An item hidden by a filter is not lost data. Optional unrun E2E is NOT RUN,
-not a reason for Draft. Do not use legacy verify-e2e.py as a default gate.
+UI/design-system/architecture changes, large diffs or explicit requests.
+Follow the plugin's risk/effort, same-candidate and bounded recovery/review
+requirements. Material UX requires actual rendered inspection per PRODUCT.md.
+Device/browser E2E only for relevant platform/critical risk or explicit request;
+use known preconditions and scripted postconditions. Hidden filtered data
+is not lost data. Optional unrun E2E is NOT RUN, not a Draft blocker.
+Legacy verify-e2e.py is not a default gate.
 
 Push with approval; create/update one PR into the integration branch.
-Run .flutter-harness/bin/verify-pr.sh against the integration base (via bash);
-do not claim delivery without a verified open PR containing local HEAD.
-Never auto-merge, force-push or bypass denied actions/required gates.
-Unresolved required checks or material findings mean Draft/INCOMPLETE,
-not success. Report observed evidence; follow the bounded plugin recovery
-and review budgets, do not start extra rounds or reload redundant context.
+Run bash .flutter-harness/bin/verify-pr.sh . BASE (use the actual base).
+Claim delivery only for a verified open PR containing local HEAD. Never
+auto-merge, force-push or bypass denied actions/required gates.
+Unresolved required checks or material findings mean Draft/INCOMPLETE.
+Report observed evidence, not guesses.
 <!-- flutter-harness:end -->
 INSTRUCTIONS
   info "Added project instructions."
