@@ -92,6 +92,28 @@ class Reports(unittest.TestCase):
             with self.assertRaises(ValueError):
                 evolution.accept(bad)
 
+    def test_scheduler_selects_only_one_and_suppresses_attempted_duplicates(self):
+        def issue(number, code, state="open", labels=(), owner=reporter.OWNER):
+            data = reporter.payload(REV, code)
+            return {"number": number, "title": reporter.title(data), "body": reporter.body(data),
+                    "state": state, "labels": [{"name": name} for name in labels],
+                    "user": {"login": owner}}
+        attempted = issue(1, "PR_RESPONSE", labels=[evolution.ATTEMPTED])
+        duplicate = issue(2, "PR_RESPONSE")
+        closed = issue(3, "BUILD_SCOPE", state="closed")
+        closed_duplicate = issue(4, "BUILD_SCOPE")
+        foreign = issue(5, "REVIEW_EVIDENCE", owner="stranger")
+        first = issue(6, "RISK_CLASSIFICATION")
+        second = issue(7, "INSTALLER_INVARIANT")
+        pages = [[second, foreign, attempted, closed], [duplicate, first, closed_duplicate]]
+        self.assertEqual(evolution.select_issue(pages)[0], 6)
+        self.assertIsNone(evolution.select_issue(pages, 2))
+        self.assertEqual(evolution.select_issue(pages, 7)[0], 7)
+        first["labels"] = [{"name": evolution.ATTEMPTED}]
+        self.assertEqual(evolution.select_issue(pages)[0], 7)
+        second["labels"] = [{"name": evolution.ATTEMPTED}]
+        self.assertIsNone(evolution.select_issue(pages))
+
 
 class PatchBoundary(unittest.TestCase):
     def test_permitted_patch_and_rejections(self):

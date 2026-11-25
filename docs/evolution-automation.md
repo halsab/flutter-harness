@@ -38,17 +38,28 @@ In the central Harness repository Settings -> Secrets and variables -> Actions:
   permission needed. Use an expiring token. This separate token enables normal
   PR CI without the GITHUB_TOKEN-created PR approval restriction.
 - Repository variable HARNESS_EVOLUTION_ENABLED=true (explicit activation).
-  Optional HARNESS_EVOLUTION_MODEL selects a supported Codex model; otherwise
-  the official action default is used. Reasoning effort is medium.
 
-Only owner-created canonical open issues on main can trigger work; public
-third-party issues cannot trigger a paid model call. No issue text is passed
-as instructions; strict schema validation reconstructs a prompt from fixed
-descriptions and a validated commit SHA. Each new issue has one automatic
-attempt. Existing issues or failed runs can be retried via owner-only
-workflow_dispatch with issue number. Until enabled, Issues accumulate without
-paid calls. If secrets are missing, the enabled workflow fails visibly.
-No periodic poll or unlimited automated retries.
+The central queue is processed Monday and Thursday (04:23 UTC), one canonical
+owner issue per run, globally serialized. This scans only Issues in Harness,
+never other projects. An attempted label is reserved before paid work;
+identical reports, including concurrent duplicates, are excluded after an
+attempt or closure. No model calls for an empty queue or missing credentials.
+Owner-only workflow_dispatch may explicitly investigate an unattempted issue
+outside the schedule. To deliberately retry, remove the attempted label
+from the report (and any exact attempted duplicate) first; no auto retries.
+GitHub can disable scheduled workflows after 60 days of repository inactivity.
+
+The investigator is fixed to GPT-6 Luna / low effort with a ten-minute job
+timeout; no default premium model, escalation or additional agent. Two
+scheduled investigations per week is a run limit, not a hard monetary or
+token cap. Use a separate API project/key with appropriate rate and spending
+controls; monitor actual API costs. Manual dispatch is outside the scheduled
+limit. Until enabled, Issues accumulate without paid calls.
+
+Only owner-created canonical open issues on main are accepted. Public
+third-party issue text never enters a model prompt; the strict schema
+reconstructs it from fixed descriptions, a commit SHA and an allowlisted
+stage. An insufficient signal stays open without a speculative patch.
 
 The investigation job has read-only repository access, no persisted Git
 credentials, no publication token, bounded time and an isolated Codex

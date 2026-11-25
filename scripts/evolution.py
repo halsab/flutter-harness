@@ -35,11 +35,40 @@ def accept(issue):
     return data
 
 
+ATTEMPTED = "harness-evolution-attempted"
+
+
+def select_issue(pages, requested=None):
+    """Select one unattempted canonical issue; skip duplicates even across machines."""
+    issues = [item for page in pages for item in page]
+    candidates, excluded = [], set()
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        # Closed canonical issues and attempted reports suppress identical reports.
+        try:
+            data = accept({**issue, "state": "open"})
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+        identity = reporter.key(data)
+        if issue.get("state") == "closed" or any(
+                label.get("name") == ATTEMPTED for label in issue.get("labels", [])):
+            excluded.add(identity)
+            continue
+        number = issue.get("number")
+        if issue.get("state") == "open" and type(number) is int and number > 0:
+            candidates.append((number, identity, data))
+    for number, identity, data in sorted(candidates, key=lambda item: item[0]):
+        if identity not in excluded and (requested is None or requested == number):
+            return number, data
+    return None
+
+
 def prompt(data):
     data = reporter.validate(data)
     return ("Investigate the following unconfirmed Harness report, not an app bug.\n"
             + SCENARIOS[data["code"]] + "\nReported revision: " + data["revision"] + "\nDelivery stage: " + data["stage"] + "\n"
-            "Read AGENTS.md and the relevant source. Establish an exact reproducible failure on current main. "
+            "Read AGENTS.md; inspect only the implicated component and its existing tests. Establish an exact reproducible failure on current main. Stop without a patch if the signal is insufficient; no broad audit, extra agents or model escalation. "
             "If no defect can be reproduced, leave the checkout unchanged. Otherwise add a focused regression "
             "test that fails before the fix, without deleting or replacing any existing test lines. For Node use an existing test suite; new Python test files are also supported. Implement the smallest root-cause correction and run existing "
             "tests. Preserve all gates, permissions and owner approval. No workflow edits, secrets, external "
@@ -124,12 +153,22 @@ def main():
     prepare = sub.add_parser("prepare")
     prepare.add_argument("issue", type=Path)
     prepare.add_argument("output", type=Path)
+    select = sub.add_parser("select")
+    select.add_argument("issues", type=Path)
+    select.add_argument("output", type=Path)
+    select.add_argument("--number", type=int)
     sub.add_parser("validate-patch")
     sub.add_parser("prove-regression")
     args = parser.parse_args()
     try:
         if args.command == "prepare":
             args.output.write_text(prompt(accept(json.loads(args.issue.read_text()))))
+        elif args.command == "select":
+            selection = select_issue(json.loads(args.issues.read_text()), args.number)
+            if selection:
+                number, data = selection
+                args.output.write_text(prompt(data))
+                print(number)
         elif args.command == "prove-regression":
             prove_regression()
         else:

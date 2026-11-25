@@ -16,6 +16,9 @@ import subprocess
 import sys
 import tempfile
 import time
+
+# Installed modules must not create untracked artifacts or alter the candidate.
+sys.dont_write_bytecode = True
 import reporter
 
 HERE = Path(__file__).resolve().parent

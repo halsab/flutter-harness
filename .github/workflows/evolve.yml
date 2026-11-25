@@ -1,7 +1,8 @@
 name: Harness evolution
 on:
-  issues:
-    types: [opened]
+  schedule:
+    # Two automatic investigations per week at most; one report per run.
+    - cron: '23 4 * * 1,4'
   workflow_dispatch:
     inputs:
       issue_number:
@@ -11,7 +12,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: harness-evolution-${{ github.event.issue.number || inputs.issue_number }}
+  group: harness-evolution
   cancel-in-progress: false
 jobs:
   prepare:
@@ -20,7 +21,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      issues: read
+      issues: write
       pull-requests: read
     outputs:
       ready: ${{ steps.prepare.outputs.ready }}
@@ -34,19 +35,32 @@ jobs:
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' && secrets.HARNESS_EVOLUTION_TOKEN != '' }}
         run: |
           set -euo pipefail
-          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER" > "$RUNNER_TEMP/issue.json"
-          if ! python3 scripts/evolution.py prepare "$RUNNER_TEMP/issue.json" "$RUNNER_TEMP/prompt.txt"; then
-            echo "Not a canonical report; skip."
+          if [[ "$CONFIGURED" != "true" ]]; then
+            echo "Evolution credentials not configured; leave reports pending."
+            exit 0
+          fi
+          args=()
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            args=(--number "$ISSUE_NUMBER")
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/issues" --method GET -f state=all -f creator=halsab -f per_page=100 --paginate --slurp > "$RUNNER_TEMP/issues.json"
+          ISSUE_NUMBER="$(python3 scripts/evolution.py select "$RUNNER_TEMP/issues.json" "$RUNNER_TEMP/prompt.txt" "${args[@]}")"
+          if [[ -z "$ISSUE_NUMBER" ]]; then
+            echo "No new canonical report; no model call."
             exit 0
           fi
           if [[ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "evolution/issue-$ISSUE_NUMBER" --state all --json number --jq length)" != 0 ]]; then
             echo "Existing PR; skip."
             exit 0
           fi
+          # Reserve the attempt before any paid work; reruns do not retry automatically.
+          gh label create harness-evolution-attempted --repo "$GITHUB_REPOSITORY" --color 6F42C1 --description "One evolution investigation reserved" --force
+          gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/labels" --method POST -f 'labels[]=harness-evolution-attempted' >/dev/null
           echo "number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
           echo "ready=true" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
@@ -57,9 +71,9 @@ jobs:
           retention-days: 1
   investigate:
     needs: prepare
-    if: needs.prepare.outputs.ready == 'true'
+    if: needs.prepare.outputs.ready == 'true' && github.run_attempt == 1
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -78,8 +92,8 @@ jobs:
           prompt-file: ${{ runner.temp }}/evolution-prompt/prompt.txt
           permission-profile: ':workspace'
           safety-strategy: drop-sudo
-          model: ${{ vars.HARNESS_EVOLUTION_MODEL }}
-          effort: medium
+          model: gpt-6-luna
+          effort: low
       - name: Export proposed patch only
         run: |
           set -euo pipefail
