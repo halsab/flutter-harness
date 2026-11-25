@@ -1,13 +1,10 @@
 name: Bootstrap quality
-
 on:
   push:
     branches: [main]
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
   shell-and-installer:
     runs-on: ubuntu-latest
@@ -17,108 +14,37 @@ jobs:
       - name: Validate Bash syntax
         run: |
           set -euo pipefail
-          for script in scripts/*.sh; do
-            bash -n "$script"
-          done
-      - name: Validate model routing and permissions
+          for script in scripts/*.sh; do bash -n "$script"; done
+      - name: Validate default OpenCode configuration
         run: |
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
-      - name: Verify OpenCode delivery-guard logic (no model calls)
+      - name: Check runtime policy hooks
         run: node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs scripts/test_resources.mjs
-      - name: Check runner stops at formatting failure
-        run: |
-          set -euo pipefail
-          tmp="$(mktemp -d)"
-          trap 'rm -rf "$tmp"' EXIT
-          mkdir -p "$tmp/project" "$tmp/bin"
-          touch "$tmp/project/pubspec.yaml"
-          printf '#!/bin/sh\nexit 1\n' > "$tmp/bin/dart"
-          printf '#!/bin/sh\ntouch "%s/flutter-was-called"\nexit 0\n' "$tmp" > "$tmp/bin/flutter"
-          chmod +x "$tmp/bin/dart" "$tmp/bin/flutter"
-          if PATH="$tmp/bin:$PATH" HARNESS_ARTIFACTS_DIR="$tmp/logs" bash scripts/check.sh "$tmp/project" standard mobile; then
-            echo "Expected format failure" >&2
-            exit 1
-          fi
-          test ! -f "$tmp/flutter-was-called"
-      - name: Verify token usage reporter (no model calls)
+      - name: Run deterministic lifecycle tests
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
-      - name: Verify Maestro shim without real devices
-        run: |
-          set -euo pipefail
-          tmp="$(mktemp -d)"
-          trap 'rm -rf "$tmp"' EXIT
-          mkdir -p "$tmp/jdk/bin" "$tmp/tools"
-          printf '#!/bin/sh\nexit 0\n' > "$tmp/jdk/bin/java"
-          printf '#!/bin/sh\nprintf "MAESTRO:%%s\\n" "$*"\n' > "$tmp/tools/maestro"
-          chmod +x "$tmp/jdk/bin/java" "$tmp/tools/maestro"
-          JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh --check
-          out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh mcp)"
-          test "$out" = "MAESTRO:mcp"
-          out="$(JAVA_HOME="$tmp/jdk" MAESTRO_BIN="$tmp/tools/maestro" bash scripts/maestro.sh test flow.yaml)"
-          test "$out" = "MAESTRO:test flow.yaml"
-      - name: Verify PR guard rejects an unpushed HEAD
-        run: |
-          set -euo pipefail
-          tmp="$(mktemp -d)"
-          trap 'rm -rf "$tmp"' EXIT
-          git -C "$tmp" init -q
-          git -C "$tmp" config user.name Harness
-          git -C "$tmp" config user.email harness@example.invalid
-          git -C "$tmp" commit -q --allow-empty -m bootstrap
-          git -C "$tmp" switch -q -c feature/test
-          head="$(git -C "$tmp" rev-parse HEAD)"
-          mkdir -p "$tmp/fakebin"
-          cat > "$tmp/fakebin/gh" <<'EOF'
-          #!/bin/sh
-          printf 'https://github.com/test/lab/pull/1\tapp\tOPEN\tfeature/test\t%s\n' "$FAKE_HEAD"
-          EOF
-          chmod +x "$tmp/fakebin/gh"
-          FAKE_HEAD="$head" PATH="$tmp/fakebin:$PATH" bash scripts/verify-pr.sh "$tmp" app
-          if FAKE_HEAD="0000000000000000000000000000000000000000" PATH="$tmp/fakebin:$PATH" bash scripts/verify-pr.sh "$tmp" app; then
-            echo "PR verifier accepted a stale remote commit" >&2
-            exit 1
-          fi
-      - name: Smoke-test installer and idempotency
+      - name: Smoke-test both installed profiles
         run: |
           set -euo pipefail
           for profile in mobile mobile-web; do
             tmp="$(mktemp -d)"
             printf 'name: fixture\ndependencies:\n  flutter:\n    sdk: flutter\n' > "$tmp/pubspec.yaml"
-            bash scripts/install.sh "$tmp" "$profile"
-            bash scripts/install.sh "$tmp" "$profile"
-            test -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
-            test -f "$tmp/.flutter-harness/bin/maestro.sh"
-            test -f "$tmp/.flutter-harness/bin/check.sh"
-            test -f "$tmp/.flutter-harness/bin/check-product.py"
-            test -f "$tmp/.flutter-harness/bin/task-plan.py"
-            test -f "$tmp/.flutter-harness/templates/product/ORCHESTRATION.md"
-            test "$(grep -Fxc '/.flutter-harness/work/' "$tmp/.gitignore")" -eq 1
-            test -f "$tmp/.flutter-harness/bin/init-product.py"
+            git -C "$tmp" init -q -b app
+            bash scripts/install.sh "$tmp" "$profile" app
+            bash scripts/install.sh "$tmp" "$profile" app
+            test -f "$tmp/.flutter-harness/managed.json"
+            test -f "$tmp/.flutter-harness/bin/harness.py"
+            test -f "$tmp/.github/workflows/flutter.yml"
             test -f "$tmp/.flutter-harness/PRODUCT.md"
-            test -f "$tmp/.flutter-harness/templates/product/BEHAVIOR.md"
-            test -f "$tmp/.flutter-harness/templates/product/DESIGN.md"
-            test -f "$tmp/.flutter-harness/templates/product/references/content-priority.svg"
-            test -f "$tmp/.flutter-harness/product.json"
-            python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["ui_profile"] == "universal"' "$tmp/.flutter-harness/product.json"
-            test -f "$tmp/.flutter-harness/templates/product/lib/design_system/design_system.dart.template"
-            test -f "$tmp/.flutter-harness/bin/verify-pr.sh"
-            test -f "$tmp/.opencode/plugins/delivery-guard/index.js"
-            test -f "$tmp/.opencode/plugins/delivery-guard/guard.mjs"
-            test -f "$tmp/.opencode/plugins/delivery-guard/quality.mjs"
-            test -f "$tmp/.opencode/plugins/delivery-guard/resources.mjs"
-            test -f "$tmp/.flutter-harness/bin/verify-e2e.py"
-            if [[ "$profile" == "mobile-web" ]]; then
-              test -f "$tmp/.flutter-harness/bin/web-preview.py"
-            fi
-            test "$(grep -c '^/.playwright-mcp/$' "$tmp/.gitignore")" -eq 1
-            test "$(grep -c '^/.flutter-harness/verification.json$' "$tmp/.gitignore")" -eq 1
+            test ! -f "$tmp/.opencode/skills/flutter-harness/SKILL.md"
+            test ! -f "$tmp/.flutter-harness/bin/verify-e2e.py"
+            test "$(grep -Fxc '/.flutter-harness/work/' "$tmp/.gitignore")" -eq 1
             test "$(grep -c '<!-- flutter-harness:start -->' "$tmp/AGENTS.md")" -eq 1
-            grep -q "\"profile\": \"$profile\"" "$tmp/.flutter-harness/config.json"
             python3 scripts/validate-opencode.py "$tmp/opencode.jsonc" "$profile"
+            git -C "$tmp" -c user.name=Harness -c user.email=harness@example.invalid commit -qm seed --allow-empty
+            python3 "$tmp/.flutter-harness/bin/harness.py" --project "$tmp" status >/dev/null
             rm -rf "$tmp"
           done
-
   material-starter:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -129,18 +55,11 @@ jobs:
           flutter-version: '3.50.1'
           channel: stable
           cache: true
-      - name: Compile and exercise the actual starter
+      - name: Create and exercise real Flutter product through canonical lifecycle
         run: |
           set -euo pipefail
+          git config --global user.name Harness
+          git config --global user.email harness@example.invalid
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
-          flutter create --empty --project-name harness_product_smoke --platforms=web "$tmp/app"
-          python3 scripts/init-product.py "$tmp/app" --template templates/product
-          cp templates/product/lib/main.dart.template "$tmp/app/lib/main.dart"
-          mkdir -p "$tmp/app/test"
-          cp templates/product/smoke_test.dart.template "$tmp/app/test/material_test.dart"
-          cd "$tmp/app"
-          flutter pub add 'material_ui:^1.1.0'
-          dart format lib test
-          flutter analyze
-          flutter test
+          python3 scripts/new-project.py "$tmp/app" harness_product_smoke dev.harness mobile-web main

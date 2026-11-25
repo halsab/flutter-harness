@@ -1,35 +1,28 @@
-# Verification policy: speed with quality
+# Verification policy
 
-Ordinary feature: one preflight diff/acceptance review to select the necessary tests, then one deterministic check.sh standard run (format, analyzer, flutter test). CI repeats fast code checks. Old tests passing cannot establish coverage of a newly added behavior. For material changes, derive acceptance evidence from the product behavior contract and original request before implementation; correct contradictory product rules, not just the code. See [the behavior guide](../templates/product/BEHAVIOR.md).
+Ordinary application changes require one successful CLI check on the exact
+candidate, then delivery. Check runs dependency resolution, formatting,
+product conventions, analyzer and fast Flutter tests. CI independently
+checks formatting without rewriting files. Use focused unit/widget tests
+for material changed behavior and error paths; no test quotas or duplicate
+all-platform scenarios. A green old suite is not proof of new behavior.
 
-Add tests only for important public behavior:
-- Dart unit tests for validation, calculations, business decisions, persistence,
-  serialization and significant error paths.
-- Flutter widget tests for consequential UI state behavior (filtering, form
-  validity, loading/errors); avoid fragile pixel/layout assertions.
-- No tests for static labels, trivial framework wiring or every class/widget.
-- Avoid duplicate scenarios at multiple levels and arbitrary coverage targets.
+Risk-based review covers interacting behavior, persistent/destructive
+operations, native/platform configuration, security, large diffs and
+substantial UI; the semantic flag in delivery.json supplements the lexical
+classifier. Required review is a real read-only child session with actual
+model/variant, matching candidate and final VERDICT: PASS. For visual risk,
+also require current candidate light/dark capture receipts and VISUAL: PASS
+immediately before VERDICT: PASS. Read PRODUCT/DESIGN for actual UX criteria.
+Screenshots do not prove interaction correctness.
 
-Integration/E2E is exceptional: use a small committed scripted scenario only
-for high-risk OS/plugin boundaries, security/payment/data-loss workflows,
-platform differences or explicit requests. One representative platform is
-often enough. Do not require Android+iOS+Web for routine changes.
+For critical native/browser acceptance use one relevant executable scenario.
+Declare required_e2e in delivery.json; CLI e2e runs actual tools on the
+launched candidate and writes a digest-bound result. Optional tests not
+needed are NOT RUN. Failed/missing required evidence stops delivery; no
+fabricated report, no hidden fallback, no auto-merge. A material correction
+requires fresh affected checks and at most one targeted independent recheck.
 
-Before any UI scenario: normalize application state, select the correct tab or
-filter, seed known data and assert the actual postcondition. In the task-filter
-incident the newly created task was hidden under Completed; treating it as a
-failed add was an agent inference error, not an app failure.
-
-Machine-run checks return exit statuses and deterministic logs. Do not rely
-on the agent's screenshot interpretation as a substitute for programmatic
-assertions. One diagnostic and one changed attempt are enough for transient
-device-input failures; then report the optional test blocked rather than
-looping. An optional unrun E2E does not block a routine PR; a failed REQUIRED
-risk-based gate does.
-
-For product projects the standard runner also checks architecture and design-system conventions. Substantial new screens/redesigns require real visual inspection and the same independent reviewer, not an additional design agent or functional E2E suite. See templates/product/PRODUCT.md and DESIGN.md: choose the visual direction before code, then inspect actual implementation against it and the behavior contract. Anticipate rejected writes before first review; use targeted checks during iteration, and run required reviewer and final check concurrently only when source is stable.
-
-An independent reviewer is optional for isolated routine work, but use one focused pre-PR review for material cross-feature interactions (e.g. sorting+search+filter) and genuine high risks. It must check acceptance criteria, missing regression assertions and material product/UX defects, not arbitrary cosmetic preferences. Test/review overhead should not overwhelm
-implementation.
-
-Reviewer effort is adaptive: Luna Medium for <=100 lines and <=3 files without risk flags, High for larger or risk-flagged changes. No automatic xhigh; explicit stronger Luna review may be selected by the owner. Count source/test additions and deletions, not generated lockfiles. Large changes require independent review; isolated trivial changes still skip it. At most two review attempts per tracked root task (initial and targeted recheck); required review evidence must match the actual selected Luna variant and candidate. Tune thresholds from observed quality, time and token use.
+The standard gate requires current evidence even for routine changes.
+The classifier is conservative and lexical, not semantic understanding.
+Local receipt provenance is not an adversarial security boundary.

@@ -64,12 +64,12 @@ class ProductTests(unittest.TestCase):
         self.write("lib/design_system/alternate.dart", "import 'package:cupertino_ui/cupertino_ui.dart';")
         self.assertIn("universal uses Material only", "\n".join(guard.verify(self.root)))
         self.config("active", "adaptive")
-        self.assertEqual(guard.verify(self.root), [])
+        self.assertIn("invalid UI profile", "\n".join(guard.verify(self.root)))
 
-    def test_legacy_boundary_unchanged(self):
+    def test_legacy_profile_rejected(self):
         self.config("active", "adaptive")
         self.write("lib/features/tasks/screens/direct.dart", "import 'package:material_ui/material_ui.dart';")
-        self.assertIn("platform UI library", "\n".join(guard.verify(self.root)))
+        self.assertIn("invalid UI profile", "\n".join(guard.verify(self.root)))
 
     def test_material_starter_defaults(self):
         template = Path(__file__).resolve().parents[1] / "templates/product"
