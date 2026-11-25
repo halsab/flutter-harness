@@ -4,6 +4,7 @@ import { taskIntent, changed, decide, recovery } from "../plugins/delivery-guard
 const base = { head: "abc", branch: "app", status: "" };
 test("detects feature intent without treating a question as work", () => {
   assert.equal(taskIntent("Добавь счётчик задач"), true);
+  assert.equal(taskIntent("Улучши поиск"), true);
   assert.equal(taskIntent("Как устроен Flutter?"), false);
 });
 test("the aborted counter run is incomplete", () => {
@@ -38,6 +39,12 @@ test("initially dirty and still dirty after a different edit is not completed", 
 });
 test("complete pushed feature with PR passes", () => {
   assert.equal(decide(base, { head: "def", branch: "feature/counter", status: "" }, true, true, "").passed, true);
+});
+test("a remote PR alone cannot complete a task without local evidence", () => {
+  const delivered = {head:"def",branch:"feature/search",status:""};
+  const result = decide(base,delivered,true,false,"Missing delivery-result.json");
+  assert.equal(result.passed,false);
+  assert.match(result.reasons.join(";"),/Missing delivery-result/);
 });
 test("a chat without edits does not require PR", () => {
   assert.equal(decide(base, base, false, false, "").active, false);
