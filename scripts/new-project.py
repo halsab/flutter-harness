@@ -21,11 +21,28 @@ def main():
     p.add_argument("base")
     a = p.parse_args()
     root = a.path.resolve()
-    if (root.exists() and (not root.is_dir() or any(root.iterdir()))) or not re.fullmatch(r"[a-z][a-z0-9_]*", a.name):
-        p.error("Expected an empty target and snake_case project name")
+    if (root.exists() and (not root.is_dir() or any(x.name != ".git" for x in root.iterdir()))) or not re.fullmatch(r"[a-z][a-z0-9_]*", a.name):
+        p.error("Expected an empty directory or empty Git repository and snake_case project name")
+    existing_git = (root/".git").exists()
+    if existing_git:
+        if not (root/".git").is_dir() or (root/".git").is_symlink():
+            p.error("Expected a normal Git repository")
+        try:
+            branch = subprocess.check_output(["git","symbolic-ref","--short","HEAD"],cwd=root,text=True).strip()
+            tracked = subprocess.check_output(["git","ls-files","-z"],cwd=root)
+            status = subprocess.check_output(["git","status","--porcelain"],cwd=root)
+        except subprocess.CalledProcessError:
+            p.error("Invalid existing Git repository")
+        if branch != a.base or tracked or status:
+            p.error("Existing empty repository must be on the requested integration branch with no tracked files or pending changes")
+    run("git","check-ref-format","--branch",a.base)
     platforms = "android,ios,web" if a.profile == "mobile-web" else "android,ios"
     run("flutter","create","--empty","--project-name",a.name,"--org",a.org,"--platforms",platforms,str(root))
-    run("git","init","-b",a.base,str(root))
+    if not existing_git:
+        if (root/".git").exists():
+            run("git","symbolic-ref","HEAD","refs/heads/"+a.base,cwd=root)
+        else:
+            run("git","init","-b",a.base,str(root))
     run(sys.executable,str(HERE/"install.py"),str(root),a.profile,a.base)
     run(sys.executable,str(HERE/"init-product.py"),str(root))
     template = HERE.parent / "templates/product"

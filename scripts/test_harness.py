@@ -27,9 +27,6 @@ class Lifecycle(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "app"
         self.root.mkdir()
-        slots=patch.object(h,"slot_path",side_effect=lambda platform:self.root.parent/"slots"/(platform+".json"))
-        slots.start()
-        self.addCleanup(slots.stop)
         self.remote = self.root.parent / "remote.git"
         self.git("init", "-b", "trunk")
         self.git("config", "user.name", "Harness")
@@ -131,16 +128,10 @@ class Lifecycle(unittest.TestCase):
             h.launch_auto(self.root,self.c,fresh=True)
             launch.assert_called_once()
 
-    def test_baseline_captured_before_source_edit(self):
-        task=h.read_json(h.work(self.root)/"task.json")
-        h.atomic_json(h.work(self.root)/"runtime.json",{"digest":task["baseline_digest"],"platform":"ios","device":"phone"})
-        with patch.object(h,"capture") as cap:
-            value=h.capture_baseline(self.root,task,"ios")
-            cap.assert_called_once_with(self.root,"ios","baseline","light","390,844")
-            self.assertEqual(value["digest"],task["baseline_digest"])
-            self.write("lib/main.dart","changed")
-            with self.assertRaisesRegex(h.Blocked,"after source edits"):
-                h.capture_baseline(self.root,task,"ios")
+    def test_launch_does_not_capture_baseline_automatically(self):
+        with patch.object(h,"runtime_targets",return_value=[("ios","phone")]),patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch",return_value={"status":"READY","platform":"ios","target":"phone"}),patch.object(h,"capture") as cap:
+            h.launch_auto(self.root,self.c)
+            cap.assert_not_called()
 
     def test_capture_reuse_requires_exact_image_and_scenario(self):
         p=self.write(".flutter-harness/work/capture.png","")
@@ -312,8 +303,7 @@ class Lifecycle(unittest.TestCase):
         digest = h.fingerprint(self.root)
         folder = self.root/".flutter-harness/previews"/digest
         folder.mkdir(parents=True)
-        plan = {"platform":"android","fixture":"mixed short/long realistic records","baseline":{"unavailable":"new screen"},
-                "scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction"}]}
+        plan = {"platform":"android","fixture":"mixed short/long realistic records","scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction"}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json", plan)
         h.atomic_json(h.work(self.root)/"visual-preflight.json", {"status":"PASS","branch":"feature/test","ready":[{"platform":"android","device":"emulator"}]})
         def write(label, theme, suffix):
@@ -323,6 +313,16 @@ class Lifecycle(unittest.TestCase):
             h.atomic_json(p.with_suffix(".json"),{"digest":digest,"label":label,"platform":"android","target":"emulator",
                 "theme":theme,"size":[390,844],"viewport":None,"sha256":hashlib.sha256(data).hexdigest()})
         return folder, write
+
+    def test_visual_accepts_no_baseline(self):
+        self.write("lib/main.dart","new candidate")
+        _,write=self.visual_fixture()
+        for label in ("final","menu"):
+            for theme in ("light","dark"):
+                write(label,theme,theme.encode())
+        result=h.visual_evidence(self.root,True)
+        self.assertEqual(result["status"],"PASS")
+        self.assertIsNone(result["baseline"])
 
     def test_visual_rejects_unrelated_baseline(self):
         self.write("lib/main.dart","new candidate")

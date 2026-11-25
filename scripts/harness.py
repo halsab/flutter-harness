@@ -196,45 +196,10 @@ def branch(root, base):
 
 
 def fetch_base(root,base):
-    # Linked worktrees share refs and FETCH_HEAD.
+    # Refresh the explicit integration reference.
     git(root,"fetch","--no-write-fetch-head","origin",
         "+refs/heads/"+base+":refs/remotes/origin/"+base)
     return text(git(root,"rev-parse","refs/remotes/origin/"+base))
-
-
-def workspace_assignment(root):
-    path=work(root)/"workspace.json"
-    return read_json(path) if path.is_file() else None
-
-
-def slot_path(platform):
-    require(platform in ("ios","android","web"),"Unknown runtime slot")
-    return Path.home()/".cache/flutter-harness/slots"/(platform+".json")
-
-
-def slot_owner(platform):
-    path=slot_path(platform)
-    return read_json(path) if path.is_file() else None
-
-
-def assert_runtime_access(root,platform,device=None):
-    assigned=workspace_assignment(root)
-    lease=slot_owner(platform)
-    if assigned:
-        require(assigned.get("branch")==text(git(root,"branch","--show-current")),
-                "Worktree branch changed; restore its assigned task branch")
-        require(assigned.get("platform")==platform and lease==assigned and assigned.get("root")==str(root),
-                "Runtime not reserved for this worktree; use its assigned slot")
-        require(platform=="web" or device==assigned.get("device"),"Device differs from reserved target")
-    else:
-        require(lease is None,"Runtime slot reserved by another Harness worktree: "+platform)
-
-
-@contextmanager
-def runtime_access(root,platform,device=None):
-    with target_lock("slot",platform):
-        assert_runtime_access(root,platform,device)
-        yield
 
 
 def begin(root, c, name):
@@ -243,8 +208,6 @@ def begin(root, c, name):
     git(root, "check-ref-format", "--branch", name)
     require(name not in (base, "main", "master", "app", "develop") and
             not name.startswith("-"), "Unsafe feature branch")
-    assigned=workspace_assignment(root)
-    require(not assigned or assigned.get("branch")==name,"Use the preassigned worktree branch: "+str((assigned or {}).get("branch")))
     require(not dirty(root), "Dirty checkout; preserve existing changes before begin")
     fetch_base(root,base)
     installed_revision(root,c,base_ref="origin/"+base)
@@ -504,8 +467,6 @@ def deliver(root, c):
     """Called only after the OpenCode policy gate and owner publication approval.
     The receipt is workflow evidence, not an adversarial security boundary."""
     name = branch(root, c["integration_branch"])
-    assigned=workspace_assignment(root)
-    require(not assigned or assigned["branch"]==name,"Worktree branch differs from assigned task")
     receipt = read_json(work(root) / "check.json")
     digest = fingerprint(root)
     require(current_check(root,digest),
@@ -662,12 +623,6 @@ def probe_runtime(root, platform, device=None):
 
 
 def runtime_targets(root,c,only=None):
-    assigned=workspace_assignment(root)
-    if assigned:
-        platform,device=assigned["platform"],assigned.get("device")
-        require(only in (None,platform),"Task requires another platform; use the correct workspace slot")
-        assert_runtime_access(root,platform,device)
-        return [(platform,device)]
     devices = json.loads(run(root,"flutter","devices","--machine",capture=True,timeout=60))
     require(isinstance(devices,list),"Invalid Flutter device discovery")
     choices = {"ios":[],"android":[]}
@@ -720,7 +675,6 @@ def visual_preflight(root,c,only=None):
     unavailable = []
     for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
         try:
-            assert_runtime_access(root,platform,target)
             dimensions = probe_runtime(root,platform,target)
         except (Blocked,OSError,ValueError,subprocess.TimeoutExpired) as exc:
             unavailable.append({"platform":platform,"device":target,"reason":str(exc)[:800]})
@@ -732,7 +686,7 @@ def visual_preflight(root,c,only=None):
     raise Blocked("No capture-capable selected runtime target")
 
 
-def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
+def launch_auto(root,c,only=None,fresh=False):
     """First successful launch pins the task target. No silent platform switch
     after baseline, no boot/install/reset of devices, no all-platform build."""
     pin = pinned_target(root)
@@ -749,7 +703,6 @@ def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
     unavailable = []
     for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
         try:
-            assert_runtime_access(root,platform,target)
             dimensions = probe_runtime(root,platform,target)
             previous = work(root)/"runtime.json"
             old = read_json(previous) if previous.is_file() else {}
@@ -759,8 +712,7 @@ def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
             # replaced, or another app is foregrounded.
             if (not fresh and pin and platform!="web" and old.get("digest")==digest
                     and old.get("platform")==platform and old.get("device")==target):
-                with runtime_access(root,platform,target):
-                    event(root,"runtime-reused",platform=platform,digest=digest)
+                event(root,"runtime-reused",platform=platform,digest=digest)
                 result = {"status":"READY","platform":platform,"target":target,"digest":digest,
                           "reused":True,"note":"Prior launch reused; inspect actual foreground UI or use --fresh"}
             else:
@@ -776,20 +728,13 @@ def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
         atomic_json(work(root)/"runtime-selection.json",{"branch":text(git(root,"branch","--show-current")),
                     "platform":platform,"device":target})
         output(**result)
-        if baseline and digest==task.get("baseline_digest"):
-            capture_baseline(root,task,platform)
         return
     output(**save_preflight(root,[],unavailable))
     raise Blocked("Pinned runtime failed; preserve comparable evidence and diagnose it" if pin else
                   "No runtime target could launch; inspect retained logs")
 
 
-def launch(root, c, platform, device, *, preprobed=False, emit=True):
-    with runtime_access(root,platform,device):
-        return launch_reserved(root,c,platform,device,preprobed=preprobed,emit=emit)
-
-
-def launch_reserved(root,c,platform,device,*,preprobed=False,emit=True):
+def launch(root,c,platform,device,*,preprobed=False,emit=True):
     require(platform != "web" or c["profile"] == "mobile-web", "Web disabled")
     digest = fingerprint(root)
     receipt = work(root) / "runtime.json"
@@ -830,34 +775,7 @@ def launch_reserved(root,c,platform,device,*,preprobed=False,emit=True):
     return result
 
 
-def capture_baseline(root,task,platform):
-    """Record the original candidate while it is actually launched, before edits."""
-    require(fingerprint(root)==task["baseline_digest"],"Cannot capture baseline after source edits")
-    target=work(root)/"baseline.json"
-    runtime=read_json(work(root)/"runtime.json")
-    if target.is_file():
-        try:
-            before=read_json(target)
-            image=root/".flutter-harness/previews"/task["baseline_digest"]/("baseline-"+platform+"-light.png")
-            meta=read_json(image.with_suffix(".json"))
-            if (before.get("branch")==task["branch"] and before.get("digest")==task["baseline_digest"]
-                and meta.get("target")==runtime["device"] and meta.get("sha256")==hashlib.sha256(image.read_bytes()).hexdigest()):
-                return before
-        except (OSError,ValueError,KeyError,Blocked):
-            pass
-    capture(root,platform,"baseline","light","390,844")
-    value={"branch":task["branch"],"digest":task["baseline_digest"],"label":"baseline","platform":platform}
-    atomic_json(target,value)
-    return value
-
-
-def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None, *, fixture=None):
-    current=read_json(work(root)/"runtime.json")
-    with runtime_access(root,platform,current.get("device")):
-        return capture_reserved(root,platform,label,theme,viewport,settle,scenario,fixture=fixture)
-
-
-def capture_reserved(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixture=None):
+def capture(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixture=None):
     require(re.fullmatch(r"[a-zA-Z0-9_-]+", label), "Invalid capture label")
     require(0.5 <= settle <= 5, "Settle must be between 0.5 and 5 seconds")
     current = read_json(work(root) / "runtime.json")
@@ -949,7 +867,6 @@ def capture_plan(root,c,refresh=()):
     require(runtime.get("digest")==digest and runtime.get("platform")==platform,
             "Run launch auto for checked candidate before capture-plan")
     require(set(refresh)<=labels,"Unknown capture label in --refresh")
-    assert_runtime_access(root,platform,runtime.get("device"))
     for item in items:
         for theme in ("light","dark"):
             image=root/".flutter-harness/previews"/digest/(item["label"]+"-"+platform+"-"+theme+".png")
@@ -985,11 +902,7 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
     require(platform in ("android", "ios", "web"), "Visual plan needs one representative platform")
     require(isinstance(plan.get("fixture"), str) and plan["fixture"].strip(), "Describe representative isolated fixture data")
     baseline = plan.get("baseline")
-    if baseline is None and (work(root)/"baseline.json").is_file():
-        before=read_json(work(root)/"baseline.json")
-        baseline={"digest":before["digest"],"label":before["label"]}
-        plan={**plan,"baseline":baseline}
-    require(isinstance(baseline, dict), "Declare baseline digest/label or unavailable reason")
+    require(baseline is None or isinstance(baseline, dict), "Optional baseline must be an object")
     preflight_path = work(root) / "visual-preflight.json"
     require(preflight_path.is_file(), "Run launch auto (or doctor visual) before runtime work")
     preflight = read_json(preflight_path)
@@ -1051,7 +964,9 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
     require(platform == "web" or any(x.get("platform") == platform and x.get("device") == target for x in preflight["ready"]),
             "Native capture target did not pass preflight")
     baseline_receipt = None
-    if "unavailable" in baseline:
+    if baseline is None:
+        pass
+    elif "unavailable" in baseline:
         require(isinstance(baseline["unavailable"], str) and baseline["unavailable"].strip(), "Explain the actual baseline blocker")
     else:
         before = baseline.get("digest")
@@ -1082,13 +997,7 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
     return result
 
 
-def e2e(root, platform, scenario, device):
-    current=read_json(work(root)/"runtime.json")
-    with runtime_access(root,platform,current.get("device")):
-        return e2e_reserved(root,platform,scenario,device)
-
-
-def e2e_reserved(root,platform,scenario,device):
+def e2e(root,platform,scenario,device):
     path = Path(scenario)
     require(not path.is_absolute() and ".." not in path.parts and
             (root / path).is_file() and not (root / path).is_symlink(),
@@ -1167,7 +1076,7 @@ def diagnostics(root, sessions, *, local_only=False):
         else:
             events=events[-100:]
     for name in ("check.json","check-attempt.json","delivery-state.json","delivery-result.json","sessions.json",
-                 "runtime.json","runtime-selection.json","task.json","visual-preflight.json","baseline.json"):
+                 "runtime.json","runtime-selection.json","task.json","visual-preflight.json"):
         candidate=directory/name
         if candidate.is_file():
             try:
@@ -1307,7 +1216,6 @@ def main():
             digest = fingerprint(root)
             output(branch=text(git(root,"branch","--show-current")),
                    base=c["integration_branch"], revision=c.get("revision"), changed=dirty(root), digest=digest,
-                   workspace=workspace_assignment(root),
                    checked=current_check(root,digest))
         elif a.command == "scaffold":
             scaffold(root, a.name, a.layers)
@@ -1316,7 +1224,7 @@ def main():
         elif a.command == "launch":
             if a.platform == "auto":
                 require(a.device is None,"Use HARNESS_IOS_DEVICE/HARNESS_ANDROID_DEVICE for preference")
-                launch_auto(root,c,a.only,a.fresh,baseline=True)
+                launch_auto(root,c,a.only,a.fresh)
             else:
                 require(a.only is None and not a.fresh,"--only and --fresh are for launch auto")
                 launch(root,c,a.platform,a.device)
