@@ -253,15 +253,19 @@ class Lifecycle(unittest.TestCase):
         self.write("lib/main.dart","new")
         self.receipt(["lib/main.dart"])
         real = h.run
-        state = {"exists":False,"create":0,"edit":0,"push":0,"body":"","title":"","head":""}
+        state = {"exists":False,"create":0,"edit":0,"push":0,"body":"","title":"","head":"","url":"https://github.com/owner/demo/pull/1"}
         def mocked(root,*args,**kwargs):
             if args[0] != "gh":
                 if args[:2] == ("git", "push"):
                     state["push"] += 1
                 return real(root,*args,**kwargs)
             cmd = args[2]
+            if args[:3] == ("gh", "repo", "view"):
+                self.assertEqual(args[3], "owner/old-demo")
+                return json.dumps({"nameWithOwner":"owner/demo","id":"R_demo"}).encode()
             if cmd == "list":
-                items = [{"number":1,"baseRefName":"trunk","headRefName":"feature/test","isCrossRepository":False,"headRepositoryOwner":{"login":"owner"},"isDraft":False,"state":"OPEN","url":"https://github.com/owner/demo/pull/1","headRefOid":state["head"],"title":state["title"],"body":state["body"]}] if state["exists"] else []
+                self.assertEqual(args[args.index("--repo")+1],"owner/demo")
+                items = [{"number":1,"baseRefName":"trunk","headRefName":"feature/test","isCrossRepository":False,"headRepositoryOwner":{"login":"owner"},"isDraft":False,"state":"OPEN","url":state["url"],"headRefOid":state["head"],"title":state["title"],"body":state["body"]}] if state["exists"] else []
                 return json.dumps(items).encode()
             if cmd == "create":
                 state["create"] += 1
@@ -278,13 +282,29 @@ class Lifecycle(unittest.TestCase):
             if cmd == "view":
                 return json.dumps({"url":"https://github.com/owner/demo/pull/1","state":"OPEN","baseRefName":"trunk","headRefName":"feature/test","headRefOid":self.git("rev-parse","HEAD"),"isDraft":False,"isCrossRepository":False}).encode()
             raise AssertionError(args)
-        with patch.object(h,"origin_repo",return_value="owner/demo"),patch.object(h,"run",side_effect=mocked):
-            with self.assertRaisesRegex(h.Blocked,"temporary"):
+        with patch.object(h,"origin_repo",return_value="owner/old-demo"),patch.object(h,"run",side_effect=mocked):
+            with self.assertRaisesRegex(h.Blocked,"temporarily"):
                 h.deliver(self.root,self.c)
             head = self.git("rev-parse","HEAD")
+            failure = h.read_json(h.work(self.root)/"delivery-state.json")
+            self.assertEqual(failure["stage"], "delivery-pushed")
+            self.assertEqual(failure["error"]["code"], "PR_CREATE_TRANSIENT")
+            self.assertTrue(failure["error"]["retryable"])
+            with self.assertRaises(h.DeliveryBlocked) as error:
+                h.completion(self.root,self.c)
+            self.assertEqual(error.exception.code, "PR_CREATE_TRANSIENT")
             h.deliver(self.root,self.c)
-            result = h.completion(self.root,self.c)
+            with patch.object(h,"canonical_repo",side_effect=AssertionError("completion must stay offline")):
+                result = h.completion(self.root,self.c)
             self.assertEqual(result["head"], head)
+            self.assertEqual(result["repo"], "owner/demo")
+            self.assertEqual(result["origin_repo"], "owner/old-demo")
+            self.assertEqual(result["repo_id"], "R_demo")
+            self.assertEqual(result["pr_number"], 1)
+            self.assertEqual(h.verify(self.root,self.c)["number"], 1)
+            with patch.object(h,"canonical_repo",return_value=("owner/demo","R_other")):
+                with self.assertRaisesRegex(h.Blocked,"Remote repository differs"):
+                    h.verify(self.root,self.c)
             (h.work(self.root)/"delivery-result.json").unlink()
             with self.assertRaisesRegex(h.Blocked, "Missing delivery-result"):
                 h.completion(self.root,self.c)
@@ -295,9 +315,51 @@ class Lifecycle(unittest.TestCase):
             self.assertEqual(state["create"],2)
             self.assertEqual(state["edit"],0)
             self.assertEqual(state["push"],2)
+            # Existing remote PR, but receipt lost and remote identity inconsistent.
+            (h.work(self.root)/"delivery-result.json").unlink()
+            state["url"] = "https://github.com/owner/other/pull/1"
+            with self.assertRaisesRegex(h.Blocked,"Unexpected PR URL"):
+                h.deliver(self.root,self.c)
+            with self.assertRaises(h.DeliveryBlocked) as error:
+                h.completion(self.root,self.c)
+            self.assertEqual(error.exception.code,"PR_URL_MISMATCH")
+            self.assertFalse(error.exception.retryable)
+            self.assertEqual(state["create"],2)
+            self.assertEqual(state["push"],2)
+            state["url"] = "https://github.com/owner/demo/pull/1"
+            h.deliver(self.root,self.c)
+            self.assertEqual(h.completion(self.root,self.c)["head"],head)
             self.write("lib/main.dart", "newer")
             with self.assertRaisesRegex(h.Blocked, "Uncommitted"):
                 h.completion(self.root,self.c)
+
+    def test_origin_formats_and_canonical_resolution(self):
+        for url in ("https://github.com/owner/old-demo.git", "git@github.com:owner/old-demo.git",
+                    "ssh://git@github.com/owner/old-demo"):
+            with self.subTest(url=url), patch.object(h,"git",return_value=url.encode()):
+                self.assertEqual(h.origin_repo(self.root),"owner/old-demo")
+        with patch.object(h,"git",side_effect=[b"https://github.com/owner/demo.git", b"https://github.com/owner/other.git"]):
+            with self.assertRaisesRegex(h.Blocked,"Push URL differs"):
+                h.origin_repo(self.root)
+
+    def test_strict_pr_identity_and_remote_classification(self):
+        pr = {"number":1,"url":"https://github.com/owner/demo/pull/1","state":"OPEN",
+              "baseRefName":"trunk","headRefName":"feature/test","headRefOid":"abc",
+              "isCrossRepository":False,"isDraft":False}
+        self.assertEqual(h.validate_remote_pr(pr,"owner/demo","trunk","feature/test","abc"),pr)
+        for change in ({"url":pr["url"]+"/files"}, {"number":2}, {"url":"https://github.com/owner/other/pull/1"},
+                       {"baseRefName":"wrong"}, {"headRefOid":"stale"}, {"isCrossRepository":True},
+                       {"isDraft":True}, {"state":"CLOSED"}):
+            with self.subTest(change=change), self.assertRaises(h.DeliveryBlocked):
+                h.validate_remote_pr({**pr,**change},"owner/demo","trunk","feature/test","abc")
+        for message, code, retryable in (("HTTP 503", "PR_LIST_TRANSIENT", True),
+                                        ("HTTP 403 Forbidden", "PR_LIST_ACCESS", False),
+                                        ("unexpected output", "PR_LIST_FAILED", False)):
+            with patch.object(h,"run",side_effect=h.Blocked(message)):
+                with self.assertRaises(h.DeliveryBlocked) as error:
+                    h.remote_call("PR_LIST", h.run, self.root)
+                self.assertEqual(error.exception.code,code)
+                self.assertEqual(error.exception.retryable,retryable)
 
     def visual_fixture(self):
         digest = h.fingerprint(self.root)

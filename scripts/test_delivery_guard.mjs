@@ -134,3 +134,29 @@ test("Build-only hook scope follows the live selected agent and excludes childre
   await hooks.get("tool/execute.before")(read);
   assert.equal(read.handled,undefined);
 });
+
+test("delivery failures preserve cause and only retry known transient failures", () => {
+  const result={current:{...base,branch:"feature/test"},reasons:["Delivery incomplete"]};
+  const q={phase:"work",issue:"",check:"passed",digest:"a"};
+  const error={code:"PR_URL_MISMATCH",stage:"delivery-pushed",message:"Unexpected PR URL",retryable:false};
+  const stop=recovery({attempts:0},{...result,deliveryError:error},q);
+  assert.equal(stop.stop,true);
+  assert.equal(stop.terminal,true);
+  assert.match(stop.reason,/PR_URL_MISMATCH at delivery-pushed/);
+  const transient={...error,code:"PR_CREATE_TRANSIENT",retryable:true};
+  const first=recovery({attempts:0},{...result,deliveryError:transient},q);
+  assert.equal(first.stop,false);
+  assert.match(first.prompt,/Preserve the existing delivery.json/);
+  const last=recovery({attempts:1,lastRecovery:first.fingerprint},{...result,deliveryError:transient},q);
+  assert.equal(last.stop,true);
+  assert.match(last.reason,/PR_CREATE_TRANSIENT/);
+  assert.equal(recovery({attempts:0},{...result,deliveryError:error},{...q,phase:"check",check:"failed"}).stop,false);
+});
+test("clean committed candidate with missing manifest must not invent acceptance flags", () => {
+  const result={current:{...base,branch:"feature/test"},reasons:["Delivery incomplete"]};
+  const q={phase:"manifest",issue:"manifest missing",check:"passed",digest:"a"};
+  const stop=recovery({attempts:0},result,q);
+  assert.equal(stop.stop,true);
+  assert.match(stop.reason,/restore the original manifest/);
+  assert.equal(recovery({attempts:0},{...result,current:{...result.current,status:" M lib/main.dart"}},q).stop,false);
+});
