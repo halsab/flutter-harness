@@ -91,6 +91,10 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(data["usage_status"],"UNAVAILABLE")
         self.assertEqual(data["standard_runs"][0]["checks"][0]["status"],"TIMEOUT")
         self.assertFalse(data["check_running"])
+        with patch.object(h,"usage") as exporter:
+            h.diagnostics(self.root,["ses_fixture"],local_only=True)
+            exporter.assert_not_called()
+        self.assertEqual(h.read_json(h.work(self.root)/"diagnostics.json")["usage_status"],"NOT_REQUESTED")
 
     def test_check_cannot_run_concurrently(self):
         with (h.work(self.root)/"check.lock").open("a") as lock:

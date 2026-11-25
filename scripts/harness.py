@@ -997,7 +997,7 @@ def usage(root, sessions, *, emit=True):
         return summary
 
 
-def diagnostics(root, sessions):
+def diagnostics(root, sessions, *, local_only=False):
     """Always retain local evidence; usage export is best effort."""
     directory = work(root)
     errors = []
@@ -1027,7 +1027,11 @@ def diagnostics(root, sessions):
             events=events[-100:]
     else:
         start=next((i for i,x in enumerate(events) if x.get("stage")=="task-start" and x.get("session") in sessions),None)
-        events=events[start:] if start is not None else events[-100:]
+        if start is not None:
+            end=next((i for i in range(start+1,len(events)) if events[i].get("stage")=="task-start" and events[i].get("session") not in sessions),len(events))
+            events=events[start:end]
+        else:
+            events=events[-100:]
     for name in ("check.json","check-attempt.json","delivery-state.json","delivery-result.json","sessions.json",
                  "runtime.json","runtime-selection.json","task.json","visual-preflight.json"):
         candidate=directory/name
@@ -1062,9 +1066,9 @@ def diagnostics(root, sessions):
     data["errors"]=errors
     target=directory/"diagnostics.json"
     # Persist immediately, even if the session exporter subsequently hangs.
-    data["usage_status"]="PENDING" if sessions else "UNAVAILABLE"
+    data["usage_status"]="NOT_REQUESTED" if local_only else "PENDING" if sessions else "UNAVAILABLE"
     atomic_json(target,data)
-    if sessions:
+    if sessions and not local_only:
         try:
             data["usage"]=usage(root,sessions,emit=False)
             data["usage_status"]="PASS"
@@ -1121,6 +1125,8 @@ def main():
     for cmd in ("usage", "diagnostics"):
         p = sub.add_parser(cmd)
         p.add_argument("sessions", nargs="*")
+        if cmd=="diagnostics":
+            p.add_argument("--local",action="store_true",help="Write local evidence without waiting for OpenCode export")
     a = parser.parse_args()
     root = a.project.resolve()
     try:
@@ -1135,7 +1141,7 @@ def main():
                     sessions=read_json(work(root)/"sessions.json").get("sessions",[])
                 except (OSError,ValueError,Blocked):
                     sessions=[]
-            diagnostics(root,sessions)
+            diagnostics(root,sessions,local_only=a.local)
             return 0
         c = config(root)
         if a.command == "revision":
