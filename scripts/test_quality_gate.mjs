@@ -206,6 +206,11 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
 
 test("combined production hooks reserve no reviewer before evidence and bind actual approval",async t=>{
   const {root}=await fixture(t);
+  // This fixture normally modifies a destructive repository; restore it to
+  // exercise a genuinely focused visual-only diff, not a High-risk change.
+  await writeFile(join(root,"lib/data/task_repository.dart"),"void old() {}\n");
+  await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
+  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// focused menu change\n");
   const values=new Map([["task/main",{active:true,request:"Измени кнопку сортировки"}]]);
   await mkdir(join(root,".flutter-harness/work"),{recursive:true});
   await writeFile(join(root,".flutter-harness/work/delivery.json"),JSON.stringify({visual_required:true,visual_interaction:true}));
