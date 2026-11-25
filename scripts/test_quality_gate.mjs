@@ -206,11 +206,16 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
 
 test("combined production hooks reserve no reviewer before evidence and bind actual approval",async t=>{
   const {root}=await fixture(t);
+  // This fixture normally modifies a destructive repository; restore it to
+  // exercise a genuinely focused visual-only diff, not a High-risk change.
+  await writeFile(join(root,"lib/data/task_repository.dart"),"void old() {}\n");
+  await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
+  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// focused menu change\n");
   const values=new Map([["task/main",{active:true,request:"Измени кнопку сортировки"}]]);
   await mkdir(join(root,".flutter-harness/work"),{recursive:true});
   await writeFile(join(root,".flutter-harness/work/delivery.json"),JSON.stringify({visual_required:true,visual_interaction:true}));
   const hooks={}, children=new Map([["main",{}]]);
-  let ready=false, visualDigest="one", quality;
+  let ready=false, manifestReady=false, visualDigest="one", quality;
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     tool:{hook:async(n,f)=>(hooks[n]??=[]).push(f)},
@@ -222,21 +227,31 @@ test("combined production hooks reserve no reviewer before evidence and bind act
     assert.equal(interaction,true);
     if(!ready)throw Error("missing menu");
     return {evidence_digest:visualDigest,captures:[{path:"menu.png"}]};
-  },resources.status,true,resources.reviewAvailability);
+  },resources.status,true,resources.reviewAvailability,async()=>{if(!manifestReady)throw Error("invalid required_e2e");});
   const emit=async(n,e)=>{for(const f of hooks[n]) await f(e);};
   const review={tool:"subagent",sessionID:"main",id:"r",input:{agent:"reviewer",prompt:"Review"}};
   await assert.rejects(emit("execute.before",review),/standard check/);
   const check={tool:"shell",sessionID:"main",id:"c",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await emit("execute.before",check);
   await emit("execute.after",{...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
+  await assert.rejects(emit("execute.before",review),/invalid required_e2e/);
+  assert.match(await quality.reason("main"),/Prepare valid delivery manifest/);
+  manifestReady=true;
   await assert.rejects(emit("execute.before",review),/missing menu/);
   assert.equal(await resources.status("main"),"");
   assert.deepEqual(await resources.sessions("main"),["main"]);
   ready=true; await emit("execute.before",review);
   assert.match(review.input.prompt,/menu.png/);
+  assert.equal(review.input.model,"openai/gpt-6-luna#medium");
   children.set("child",{parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}});
   await emit("execute.after",{...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.equal(await quality.reason("main"),"");
   visualDigest="two";
   assert.match(await quality.reason("main"),/reviewer verdict/);
+});
+
+test("focused visual review uses Medium but structural and broad work remains High",()=>{
+  assert.equal(reviewEffort({files:2,lines:110},["material UI redesign or design-system change"]),"medium");
+  assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"high");
+  assert.equal(reviewEffort({files:1,lines:20},["persistent data, storage or sensitive operation changed"]),"high");
 });

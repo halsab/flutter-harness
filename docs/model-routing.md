@@ -18,3 +18,5 @@ Read ORCHESTRATION only for broad work. No automatic repeated full review,
 whole-project scans or redundant context. Use CLI usage for sanitized
 parent/child exports, not a separate model call. Token counters may overlap
 and are not billing or subscription quotas.
+
+Focused visual-only diffs of at most 200 measured lines and 3 files use Luna Medium. Broad redesign, shared design-system changes, other risk flags and larger changes use High. The guard selects exact effort, not a parent-requested escalation. Read only changed files and necessary dependencies; actual image inspection remains mandatory.
