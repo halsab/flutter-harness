@@ -167,7 +167,7 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// visual change\n");
   const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
   const hooks={};
-  let verdict="VERDICT: PASS";
+  let verdict="VERDICT: PASS", visualReady=false, visualDigest="one";
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     tool:{hook:async(n,f)=>hooks[n]=f},
@@ -177,17 +177,26 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
       context:async()=>[{type:"assistant",content:[{type:"text",text:verdict}]}],
     },
   };
-  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{});
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{
+    if(!visualReady)throw Error("missing interaction");
+    return {evidence_digest:visualDigest,captures:[{path:"final.png"}]};
+  });
   const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review"}};
+  await assert.rejects(hooks["execute.before"](review),/missing interaction/);
+  assert.match(await q.reason("main"),/runtime evidence/);
+  visualReady=true;
   await hooks["execute.before"](review);
   assert.match(review.input.prompt,/VISUAL: PASS/);
   await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.match(await q.reason("main"),/reviewer verdict/);
   verdict="VISUAL: PASS\nVERDICT: PASS";
   assert.equal(await q.reason("main"),"");
+  visualDigest="two";
+  assert.match(await q.reason("main"),/reviewer verdict/);
+  visualDigest="one";
   git("add","."); git("commit","-qm","visual change");
   assert.equal(await q.reason("main"),"");
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// changed again\n");

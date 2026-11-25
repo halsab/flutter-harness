@@ -12,7 +12,7 @@ operations, native/platform configuration, security, large diffs and
 substantial UI; the semantic flag in delivery.json supplements the lexical
 classifier. Required review is a real read-only child session with actual
 model/variant, matching candidate and final VERDICT: PASS. For visual risk,
-also require current candidate light/dark capture receipts and VISUAL: PASS
+also require current candidate planned screen/interaction light/dark capture receipts before dispatch, and bind review to the exact evidence digest plus VISUAL: PASS
 immediately before VERDICT: PASS. Read PRODUCT/DESIGN for actual UX criteria.
 Screenshots do not prove interaction correctness.
 
@@ -21,7 +21,7 @@ Declare required_e2e in delivery.json; CLI e2e runs actual tools on the
 launched candidate and writes a digest-bound result. Optional tests not
 needed are NOT RUN. Failed/missing required evidence stops delivery; no
 fabricated report, no hidden fallback, no auto-merge. A material correction
-requires fresh affected checks and at most one targeted independent recheck.
+requires fresh affected checks and at most one substantive targeted independent recheck. A technical BLOCKED/ERROR may permit one extra bounded dispatch; unchanged evidence cannot be re-reviewed merely by asking again.
 
 The standard gate requires current evidence even for routine changes.
 The classifier is conservative and lexical, not semantic understanding.
