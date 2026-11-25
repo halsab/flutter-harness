@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tempfile
 
 import reporter
 
@@ -37,10 +38,10 @@ def accept(issue):
 def prompt(data):
     data = reporter.validate(data)
     return ("Investigate the following unconfirmed Harness report, not an app bug.\n"
-            + SCENARIOS[data["code"]] + "\nReported revision: " + data["revision"] + "\n"
+            + SCENARIOS[data["code"]] + "\nReported revision: " + data["revision"] + "\nDelivery stage: " + data["stage"] + "\n"
             "Read AGENTS.md and the relevant source. Establish an exact reproducible failure on current main. "
             "If no defect can be reproduced, leave the checkout unchanged. Otherwise add a focused regression "
-            "test that fails before the fix, implement the smallest root-cause correction, and run existing "
+            "test that fails before the fix, without deleting or replacing any existing test lines. For Node use an existing test suite; new Python test files are also supported. Implement the smallest root-cause correction and run existing "
             "tests. Preserve all gates, permissions and owner approval. No workflow edits, secrets, external "
             "project access, publishing or unrelated changes. Never invent evidence or change tests merely "
             "to pass. Only modify scripts/, plugins/delivery-guard/, templates/ or docs/. Do not commit.\n")
@@ -50,6 +51,13 @@ def git(*args):
     return subprocess.check_output(["git", *args])
 
 
+NODE_TESTS = {"scripts/test_delivery_guard.mjs", "scripts/test_quality_gate.mjs", "scripts/test_resources.mjs"}
+
+
+def regression_test(name):
+    return name in NODE_TESTS or re.fullmatch(r"scripts/test_[A-Za-z0-9_]+\.py", name) is not None
+
+
 def validate_staged():
     # All names originate from Git, never shell interpolation.
     changed = git("diff", "--cached", "--name-only", "-z").decode().split("\0")
@@ -57,7 +65,8 @@ def validate_staged():
     allowed = ("scripts/", "plugins/delivery-guard/", "templates/", "docs/")
     if not changed or len(changed) > 12 or any(not name.startswith(allowed) for name in changed):
         raise ValueError("Patch is empty, oversized or outside permitted paths")
-    if not any(re.fullmatch(r"scripts/test_[^/]+\.(?:py|mjs)", name) for name in changed):
+    tests = [name for name in changed if regression_test(name)]
+    if not tests:
         raise ValueError("Regression test required")
     raw = git("diff", "--cached", "--raw", "--no-renames").decode().splitlines()
     for line in raw:
@@ -71,10 +80,42 @@ def validate_staged():
     stat = git("diff", "--cached", "--numstat").decode().splitlines()
     total = 0
     for line in stat:
-        added, removed, _ = line.split("\t", 2)
+        added, removed, name = line.split("\t", 2)
+        if name in tests and (int(removed) != 0 or int(added) == 0):
+            raise ValueError("Automated regression protection must add tests without removing existing lines")
         total += int(added) + int(removed)
     if total > 500:
         raise ValueError("Patch exceeds 500 changed lines")
+    return tests
+
+
+def test_result(root, name):
+    command = ([sys.executable, "-m", "unittest", "discover", "-s", "scripts", "-p", Path(name).name]
+               if name.endswith(".py") else ["node", "--test", name])
+    return subprocess.run(command, cwd=root, timeout=150).returncode
+
+
+def prove_regression():
+    """Run unchanged tests, then the added tests against the exact unpatched source."""
+    tests = validate_staged()
+    patch = git("diff", "--cached", "--binary", "--", *tests)
+    with tempfile.TemporaryDirectory(prefix="harness-regression-") as directory:
+        baseline = Path(directory) / "base"
+        subprocess.run(["git", "worktree", "add", "--detach", str(baseline), "HEAD"], check=True)
+        try:
+            for name in tests:
+                if (baseline / name).is_file() and test_result(baseline, name) != 0:
+                    raise ValueError("Original test suite already fails; cannot prove new regression")
+            subprocess.run(["git", "apply", "--index", "-"], cwd=baseline, input=patch, check=True)
+            subprocess.run(["git", "-c", "user.name=Harness", "-c", "user.email=harness@example.invalid",
+                            "-c", "core.hooksPath=/dev/null", "commit", "-m", "regression tests only"],
+                           cwd=baseline, check=True)
+            results = [test_result(baseline, name) for name in tests]
+            if any(result not in (0, 1) for result in results) or 1 not in results:
+                raise ValueError("New tests did not expose a failing scenario on original source")
+        finally:
+            subprocess.run(["git", "worktree", "remove", "--force", str(baseline)], check=True)
+    print("PASS regression: original tests passed; new tests fail on original source")
 
 
 def main():
@@ -84,10 +125,13 @@ def main():
     prepare.add_argument("issue", type=Path)
     prepare.add_argument("output", type=Path)
     sub.add_parser("validate-patch")
+    sub.add_parser("prove-regression")
     args = parser.parse_args()
     try:
         if args.command == "prepare":
             args.output.write_text(prompt(accept(json.loads(args.issue.read_text()))))
+        elif args.command == "prove-regression":
+            prove_regression()
         else:
             validate_staged()
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError) as exc:

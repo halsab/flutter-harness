@@ -563,6 +563,8 @@ def deliver(root, c):
         if state:
             if isinstance(exc, DeliveryBlocked):
                 failure = exc
+                if failure.stage is None:
+                    failure.stage = state["stage"]
             elif isinstance(exc, Blocked) and "\n" not in str(exc) and "exit=" not in str(exc):
                 failure = DeliveryBlocked("DELIVERY_INVARIANT", str(exc)[:240])
             else:
@@ -1391,7 +1393,7 @@ def main():
             except OSError:
                 pass
         if a.command == "deliver" and isinstance(exc, DeliveryBlocked):
-            reporter.report(root, locals().get("c", {}).get("revision"), exc.code, automatic=True)
+            reporter.report(root, locals().get("c", {}).get("revision"), exc.code, automatic=True, stage=exc.stage)
         if a.command == "completion" and isinstance(exc, DeliveryBlocked):
             output(status="BLOCKED", stage=exc.stage, error=exc.details())
         if a.command == "deliver" and isinstance(exc, DeliveryBlocked) and isinstance(exc.__cause__, Blocked):

@@ -13,13 +13,13 @@ finite list of categories. A report is an unconfirmed signal, not proof that
 Harness is defective. Ordinary test/analyzer failures, permissions, network
 outages and generic invariants are not reported automatically.
 
-The only public payload is schema, Harness commit SHA and catalog code.
+The only public payload is schema, Harness commit SHA, catalog code and an allowlisted delivery stage (unspecified for semantic reports).
 No source, project identifier, local path, prompt, stderr, URL, screenshot,
 token or arbitrary text. Only the authenticated halsab account can publish.
 Set HARNESS_REPORTS=off to disable all reporting; CI is always excluded.
 A local queue and receipts live under ignored .flutter-harness/work/lessons.
 Transport is synchronous, bounded per GitHub API request, and never a delivery
-gate. At most one queued item is retried at begin. Each code+revision is
+gate. At most one queued item is retried at begin. Each code+revision+stage is
 deduplicated locally and against owner Issues, including closed Issues.
 Concurrent first submissions from separate machines can still race; do not
 treat issue creation as an exactly-once distributed transaction. Report data
@@ -56,11 +56,9 @@ workspace with sudo dropped. If there is no reproducible defect, the agent
 should produce no patch; issue remains open. Patch is handed to a separate
 credential-free verification job. A trusted copy of the original validator
 rejects out-of-scope, binary, special-mode, oversized and testless changes.
-Existing deterministic tests are run before a fresh publisher applies the
-same patch without executing candidate code. Publication uses one fixed branch
+Automated fixes must add regression test lines without removing existing ones. In a disposable local Git worktree the original targeted tests must pass, and the same tests with only the new test changes must fail against the original source. Then the clean committed candidate must pass the existing deterministic suites before a fresh publisher applies the same patch without executing candidate code. Publication uses one fixed branch
 per issue, never force-pushes or merges; the full existing PR CI and owner
-review remain required. A test change is not proof that a regression really
-fails on the original implementation; inspect evidence during owner review.
+review remain required. The baseline failure is mechanical evidence, not a proof of semantic correctness; an unrelated assertion or import error can still mislead, so review the actual defect and test during owner approval.
 
 No autonomous change to installed Harness or its release process. A merged
 PR closes the issue normally through GitHub's closing reference. Failed or

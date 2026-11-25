@@ -16,7 +16,10 @@ SEMANTIC_CODES = frozenset({
     "DELIVERY_RECONCILIATION", "INSTALLER_INVARIANT",
 })
 CODES = AUTO_CODES | SEMANTIC_CODES
-FIELDS = {"schema", "revision", "code"}
+STAGES = frozenset({"unspecified", "delivery-started", "delivery-resolving", "delivery-resolved",
+                    "delivery-validated", "delivery-committed", "delivery-pushed",
+                    "delivery-remote-verified", "delivery-complete"})
+FIELDS = {"schema", "revision", "code", "stage"}
 MAX_QUEUE = 32
 TIMEOUT = 8
 
@@ -25,18 +28,20 @@ def enabled():
     return not os.environ.get("CI") and os.environ.get("HARNESS_REPORTS", "on").lower() != "off"
 
 
-def payload(revision, code):
+def payload(revision, code, stage="unspecified"):
     if type(revision) is not str or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("Invalid Harness revision")
     if type(code) is not str or code not in CODES:
         raise ValueError("Unknown lesson code")
-    return {"schema": 1, "revision": revision, "code": code}
+    if type(stage) is not str or stage not in STAGES:
+        raise ValueError("Unknown report stage")
+    return {"schema": 1, "revision": revision, "code": code, "stage": stage}
 
 
 def validate(value):
     if type(value) is not dict or set(value) != FIELDS or type(value["schema"]) is not int or value["schema"] != 1:
         raise ValueError("Invalid report schema")
-    return payload(value["revision"], value["code"])
+    return payload(value["revision"], value["code"], value["stage"])
 
 
 def canonical(value):
@@ -101,6 +106,7 @@ def _process(root, value=None):
     directory = queue_dir(root)
     if value is None and not directory.is_dir():
         return "EMPTY"
+    saved = False
     try:
         directory.mkdir(parents=True, exist_ok=True)
         with (directory / "queue.lock").open("a") as lock:
@@ -121,6 +127,7 @@ def _process(root, value=None):
                 path = next(iter(sorted(directory.glob("*.json"))), None)
                 if path is None:
                     return "EMPTY"
+            saved = True
             queued = validate(json.loads(path.read_text()))
             if path.name != key(queued) + ".json":
                 return "INVALID_QUEUE"
@@ -131,14 +138,14 @@ def _process(root, value=None):
                 return "REPORTED"
             return "QUEUED"
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
-        return "QUEUED"
+        return "QUEUED" if saved else "UNAVAILABLE"
 
 
-def report(root, revision, code, automatic=False):
+def report(root, revision, code, automatic=False, stage=None):
     if type(code) is not str or code not in (AUTO_CODES if automatic else SEMANTIC_CODES):
         return "IGNORED"
     try:
-        return _process(root, payload(revision, code))
+        return _process(root, payload(revision, code, stage if type(stage) is str and stage in STAGES else "unspecified"))
     except ValueError:
         return "IGNORED"
 

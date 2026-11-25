@@ -114,7 +114,9 @@ jobs:
           fi
           cp scripts/evolution.py scripts/reporter.py "$RUNNER_TEMP/"
           git apply --index "$patch"
-          python3 "$RUNNER_TEMP/evolution.py" validate-patch
+          python3 "$RUNNER_TEMP/evolution.py" prove-regression
+          # Installer tests require a clean, committed source revision.
+          git -c user.name=Harness -c user.email=harness@example.invalid -c core.hooksPath=/dev/null commit -m "isolated verification candidate"
           for script in scripts/*.sh; do bash -n "$script"; done
           python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
           python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
@@ -155,4 +157,4 @@ jobs:
           git switch -c "$branch"
           git -c user.name="Harness Evolution" -c user.email="harness-evolution@users.noreply.github.com" -c core.hooksPath=/dev/null commit -m "fix: investigate Harness report #$ISSUE_NUMBER"
           git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin "HEAD:refs/heads/$branch"
-          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "Harness evolution: report #$ISSUE_NUMBER" --body "Closes #$ISSUE_NUMBER. Automated regression candidate; deterministic checks ran in an isolated job. Full PR CI and owner review are required."
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "Harness evolution: report #$ISSUE_NUMBER" --body "Closes #$ISSUE_NUMBER. Automated regression candidate; new tests failed on original source and all deterministic checks ran in an isolated job. Full PR CI and owner review are required."

@@ -26,11 +26,14 @@ class Reports(unittest.TestCase):
             self.assertEqual(reporter.report(self.root, REV, code, automatic=True), "IGNORED")
         self.assertEqual(reporter.report(self.root, "secret", "PR_RESPONSE", True), "IGNORED")
         data = reporter.payload(REV, "PR_RESPONSE")
-        self.assertEqual(set(data), {"schema", "revision", "code"})
+        self.assertEqual(set(data), {"schema", "revision", "code", "stage"})
         with self.assertRaises(ValueError):
             reporter.validate({**data, "log": "private"})
         with self.assertRaises(ValueError):
             reporter.validate({**data, "schema": True})
+        with self.assertRaises(ValueError):
+            reporter.validate({**data, "stage": "/private/path"})
+        self.assertNotEqual(reporter.key(data), reporter.key(reporter.payload(REV, "PR_RESPONSE", "delivery-pushed")))
 
     def test_offline_queue_retry_and_local_dedup(self):
         with patch.object(reporter, "send", side_effect=subprocess.TimeoutExpired("gh", 8)):
@@ -43,6 +46,14 @@ class Reports(unittest.TestCase):
             self.assertEqual(reporter.report(self.root, REV, "PR_RESPONSE", True), "ALREADY_REPORTED")
             send.assert_called_once()
         self.assertEqual(reporter.retry(self.root), "EMPTY")
+
+    def test_stage_is_allowlisted_and_queue_failure_is_not_claimed_saved(self):
+        with patch.object(reporter, "send", return_value=False):
+            self.assertEqual(reporter.report(self.root, REV, "PR_RESPONSE", True, stage="/private/path"), "QUEUED")
+        queued = next(reporter.queue_dir(self.root).glob("*.json"))
+        self.assertEqual(json.loads(queued.read_text())["stage"], "unspecified")
+        with patch.object(reporter, "save", side_effect=OSError("disk full")):
+            self.assertEqual(reporter.report(self.root, REV, "PR_URL_MISMATCH", True), "UNAVAILABLE")
 
     def test_ci_and_opt_out_do_not_send(self):
         for override in ({"CI": "true"}, {"HARNESS_REPORTS": "off"}):
@@ -84,8 +95,11 @@ class Reports(unittest.TestCase):
 class PatchBoundary(unittest.TestCase):
     def test_permitted_patch_and_rejections(self):
         raw = b":100644 100644 aaa bbb M\tscripts/test_harness.py\n"
+        with patch.object(evolution, "git", side_effect=[b"scripts/test_harness.py\0", raw, b"2\t0\tscripts/test_harness.py\n"]):
+            self.assertEqual(evolution.validate_staged(), ["scripts/test_harness.py"])
         with patch.object(evolution, "git", side_effect=[b"scripts/test_harness.py\0", raw, b"2\t1\tscripts/test_harness.py\n"]):
-            evolution.validate_staged()
+            with self.assertRaises(ValueError):
+                evolution.validate_staged()
         for names in (b".github/workflows/bootstrap.yml\0scripts/test_harness.py\0",
                       b"scripts/harness.py\0", b""):
             with patch.object(evolution, "git", return_value=names):
