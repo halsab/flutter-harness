@@ -114,47 +114,51 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 
 <!-- flutter-harness:start -->
 ## Flutter Harness
-Project tooling: https://github.com/halsab/flutter-harness
-Read .flutter-harness/config.json and load the flutter-harness skill.
-Read .flutter-harness/PRODUCT.md for the mandatory feature-first MVVM, UX,
-UI profile and design-system baseline. Default Material 3 on all platforms, Flutter Web only.
-Adopt the foundation before application delivery; do not disable the check.
+Read .flutter-harness/config.json and product.json for the profile and adoption status.
+For an isolated fix or routine feature in an active product, use this compact
+workflow directly. Load the flutter-harness skill for pending/unknown adoption,
+substantial UI/architecture changes, interacting behavior, high risk, complex
+multi-slice work or difficult recovery. If uncertain, load the skill.
+Read .flutter-harness/PRODUCT.md before foundation adoption or meaningful
+UI/architecture changes; preserve the adopted baseline on other tasks.
+Default: feature-first MVVM, Material 3, Flutter Web; never disable the guard.
 
-User requests describe outcomes; implement with minimal technical approvals.
-Use a feature branch from app (Lab) or the documented integration branch.
-Preserve unrelated edits, particularly local opencode.jsonc; stage only task files.
-Default build: GPT-6 Luna Medium. Complex planning/diagnosis: Luna High.
-Simple delegated slices: Luna Low. Follow the orchestration guide for large
-changes; one parent owns verification and delivery. Optional Sol Medium
-advisor only for one compact consequential architectural decision per task;
-no premium implementation or automatic escalation.
-Format once with dart format lib test, then run one standard check.
-Never remove a failing acceptance test to make checks green. Risky persistent
-or destructive changes require a successful check and independent reviewer
-verdict on the exact candidate before publication.
-Write focused unit tests for important logic and widget tests only for stateful
-UI behavior. No tests for boilerplate, trivial styling or coverage quotas.
-Android/iOS/Web device/browser E2E are NOT required for ordinary features.
-Choose a minimal scripted integration check only when platform/critical risk
-actually demands it, or the user explicitly requests E2E.
-Do not infer a failed save from an item hidden by a selected filter.
-If optional E2E is not needed, report NOT RUN (not required), not BLOCKED.
-The legacy verify-e2e.py helper is optional, not a delivery gate.
-Preflight one task-diff review BEFORE final checks. Match important new
-observable behavior to a focused unit/widget test; green old tests are not
-evidence for untested sorting/filter interactions. Avoid redundant tests.
-Keep main.dart as entrypoint; put growing feature UI/view state in feature
-folders with no gratuitous state-management dependency.
-One bounded independent read-only reviewer for cross-feature interactions,
-security, sensitive data, migration, concurrency, large architecture or
-explicit user request. Skip reviewer for trivial changes; no review loops.
-The plugin routes reviewer Luna Medium/High from diff size and risk; large
-changes still require review. No automatic xhigh. One advisor and at most two
-review attempts per tracked root task; phase-aware recovery stops on no progress.
-If required checks pass, push with approval and create a normal PR into app.
-If a genuinely required check fails or a material finding remains, use Draft.
-Never auto-merge or force-push. Respect denied tool actions and golden approvals.
-Keep verification concise and report only actual command results.
+Implement the user outcome; ask only material product/security questions.
+Fetch the integration base (app in Lab), work on a feature branch, preserve
+unrelated changes and stage only task files. Default Luna Medium; no routine
+subagents. For material changed behavior use the compact BEHAVIOR.md guide
+under .flutter-harness/templates/product/ before code. Load DESIGN.md for
+substantial visual work and ORCHESTRATION.md for complex multi-slice work.
+Luna High plans/diagnoses complex work, Low handles bounded slices; one parent
+owns delivery. Optional Sol Medium advisor only as specified in ORCHESTRATION.md;
+no automatic escalation or premium implementation.
+
+Inspect the task diff once before final checks. Match meaningful new behavior
+to a focused unit/widget assertion; reuse adequate existing tests. No tests
+for trivial labels/styling or quotas; never delete a failing acceptance test
+to get green CI. Format touched Dart files, run one standard check:
+bash .flutter-harness/bin/check.sh . standard PROFILE
+Replace PROFILE with the installed profile. Reuse evidence on unchanged
+candidates; diagnose the first real failure and make a changed attempt,
+not a blind rerun. Keep main.dart focused on bootstrap, reuse the design system.
+
+Use independent read-only review for interacting behavior, persistent-data
+mutations, destructive changes, security, migration, concurrency, substantial
+UI/design-system/architecture changes, large diffs or explicit request.
+Follow plugin risk/effort and same-candidate review/check requirements.
+Material UX changes require actual runtime visual inspection per PRODUCT.md.
+Device/browser E2E only for actual platform/critical risk or explicit request;
+use scripted assertions with known initial state and exact postconditions.
+An item hidden by a filter is not lost data. Optional unrun E2E is NOT RUN,
+not a reason for Draft. Do not use legacy verify-e2e.py as a default gate.
+
+Push with approval; create/update one PR into the integration branch.
+Run .flutter-harness/bin/verify-pr.sh against the integration base (via bash);
+do not claim delivery without a verified open PR containing local HEAD.
+Never auto-merge, force-push or bypass denied actions/required gates.
+Unresolved required checks or material findings mean Draft/INCOMPLETE,
+not success. Report observed evidence; follow the bounded plugin recovery
+and review budgets, do not start extra rounds or reload redundant context.
 <!-- flutter-harness:end -->
 INSTRUCTIONS
   info "Added project instructions."
