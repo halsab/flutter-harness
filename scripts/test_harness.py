@@ -104,6 +104,29 @@ class Lifecycle(unittest.TestCase):
             h.launch_auto(self.root,self.c,fresh=True)
             launch.assert_called_once()
 
+    def test_capture_plan_runs_scripted_states_serially(self):
+        self.write("maestro/screen.yaml","appId: dev.test\n---\n- launchApp\n")
+        self.write("maestro/menu.yaml","appId: dev.test\n---\n- launchApp\n")
+        digest = h.fingerprint(self.root)
+        h.atomic_json(h.work(self.root)/"check.json",{"status":"PASS","digest":digest})
+        h.atomic_json(h.work(self.root)/"runtime.json",{"platform":"ios","device":"phone","digest":digest})
+        h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
+        plan={"platform":"ios","scenarios":[{"label":"main","kind":"screen","scenario":"maestro/screen.yaml"},
+                {"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml"}]}
+        h.atomic_json(h.work(self.root)/"visual-plan.json",plan)
+        with patch.object(h,"capture") as cap,patch.object(h,"visual_evidence") as evidence:
+            h.capture_plan(self.root,self.c)
+            self.assertEqual([(x.args[2],x.args[3],x.kwargs["scenario"]) for x in cap.call_args_list],
+                 [("main","light","maestro/screen.yaml"),("main","dark","maestro/screen.yaml"),
+                  ("menu","light","maestro/menu.yaml"),("menu","dark","maestro/menu.yaml")])
+            evidence.assert_called_once_with(self.root,True)
+            cap.reset_mock()
+            plan["scenarios"][1].pop("scenario")
+            h.atomic_json(h.work(self.root)/"visual-plan.json",plan)
+            with self.assertRaisesRegex(h.Blocked,"scripted scenario"):
+                h.capture_plan(self.root,self.c)
+            cap.assert_not_called()
+
     def test_prepare_delivery_defaults_and_early_validation(self):
         self.write("lib/main.dart","new")
         a = h.argparse.Namespace(message="change",title="Change",body="description",review=False,visual=False,interaction=True,e2e=[])

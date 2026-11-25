@@ -45,7 +45,8 @@ export function classify(paths, request = "", removed = [], diff = "") {
 }
 // Count additions and deletions in source/tests, excluding generated lockfiles.
 export function reviewEffort({ files, lines }, reasons = []) {
-  if (lines > 200 || files > 3 || reasons.some(r => r !== visualRisk)) return "high";
+  const focusedVisual = reasons.length === 1 && reasons[0] === visualRisk;
+  if (lines > (focusedVisual ? 200 : 100) || files > 3 || reasons.some(r => r !== visualRisk)) return "high";
   return "medium";
 }
 const reviewModel = "openai/gpt-6-luna";

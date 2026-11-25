@@ -868,6 +868,8 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
                 "sha256":hashlib.sha256(data).hexdigest(),
             }.items()) and isinstance(receipt.get("target"), str) and receipt["target"],
                     f"Stale or invalid capture: {path.name}")
+            require("scenario" not in item or receipt.get("scenario")==item["scenario"],
+                    "Capture scenario differs from planned state: "+path.name)
             require(platform != "web" or item["kind"] != "interaction" or receipt.get("scenario"),
                     "Web interaction capture needs a Playwright scenario; a fresh-page screenshot is insufficient")
             targets.add(receipt["target"])
@@ -1080,7 +1082,7 @@ def main():
                 require(a.device is None,"Use HARNESS_IOS_DEVICE/HARNESS_ANDROID_DEVICE for preference")
                 launch_auto(root,c,a.only,a.fresh)
             else:
-                require(a.only is None,"--only is for launch auto")
+                require(a.only is None and not a.fresh,"--only and --fresh are for launch auto")
                 launch(root,c,a.platform,a.device)
         elif a.command == "prepare-delivery":
             prepare_delivery(root,c,a)
@@ -1106,7 +1108,7 @@ def main():
                 usage(root, sessions)
         return 0
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
-        if a.command in ("begin", "check", "deliver", "doctor", "launch", "capture", "visual-evidence", "e2e"):
+        if a.command in ("begin", "check", "deliver", "doctor", "launch", "capture", "capture-plan", "prepare-delivery", "validate-delivery", "visual-evidence", "e2e"):
             try:
                 # Keep compact shareable error classifications; full command logs
                 # remain local. No arbitrary stderr, prompts or environment values.
