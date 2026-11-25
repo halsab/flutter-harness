@@ -34,9 +34,8 @@ class Lifecycle(unittest.TestCase):
         self.write("pubspec.yaml", "name: demo\n")
         self.write(".gitignore", "/.flutter-harness/work/\n/.flutter-harness/previews/\n")
         self.write("lib/main.dart", "old")
-        self.c = {"schema": 2, "integration_branch": "trunk", "profile": "mobile-web"}
-        self.write(".flutter-harness/config.json", json.dumps(self.c))
-        self.write(".flutter-harness/product.json", "{}")
+        installer.install(self.root,"mobile-web","trunk")
+        self.c = h.config(self.root)
         self.git("add", ".")
         self.git("commit", "-m", "baseline")
         subprocess.run(["git","init","--bare",str(self.remote)],check=True,capture_output=True)
@@ -56,6 +55,75 @@ class Lifecycle(unittest.TestCase):
     def receipt(self, files):
         h.atomic_json(h.work(self.root)/"check.json", {"status":"PASS","digest":h.fingerprint(self.root),"checked_at":123})
         h.atomic_json(h.work(self.root)/"delivery.json",{"files":files,"message":"feat: change","title":"Change","body":"Verified","required_e2e":[]})
+
+    def test_revision_mismatch_blocks_before_branch_switch(self):
+        self.assertEqual(h.installed_revision(self.root,self.c)["revision"],self.c["revision"])
+        with self.assertRaisesRegex(h.Blocked,"expected"):
+            h.installed_revision(self.root,self.c,"0"*40)
+        # A locally committed, internally consistent newer installation
+        # must not be silently replaced by the fetched integration branch.
+        cpath=self.root/".flutter-harness/config.json"
+        mpath=self.root/".flutter-harness/managed.json"
+        self.c["revision"]="1"*40
+        cpath.write_text(json.dumps(self.c))
+        m=h.read_json(mpath)
+        m["revision"]=self.c["revision"]
+        m["files"][".flutter-harness/config.json"]=hashlib.sha256(cpath.read_bytes()).hexdigest()
+        h.atomic_json(mpath,m)
+        self.git("add",".")
+        self.git("commit","-m","sync pending")
+        with self.assertRaisesRegex(h.Blocked,"different Harness revision"):
+            h.begin(self.root,self.c,"feature/next")
+        self.assertEqual(self.git("branch","--show-current"),"feature/test")
+
+    def test_managed_file_tamper_rejected(self):
+        self.write(".flutter-harness/PRODUCT.md","changed")
+        with self.assertRaisesRegex(h.Blocked,"Managed Harness file differs"):
+            h.installed_revision(self.root,self.c)
+
+    def test_runtime_selection_stops_and_pins_successful_fallback(self):
+        with patch.object(h,"runtime_targets",return_value=[("ios","phone"),("android","emu"),("web",None)]) as discovery, \
+             patch.object(h,"probe_runtime",return_value=[390,844]) as probe, \
+             patch.object(h,"launch",side_effect=[h.Blocked("launch failed"),{"status":"READY","platform":"android","target":"emu"}]) as launch:
+            h.launch_auto(self.root,self.c)
+            self.assertEqual(launch.call_count,2)
+            self.assertEqual(probe.call_count,2)
+            self.assertEqual(h.pinned_target(self.root),("android","emu"))
+            launch.side_effect=None
+            launch.return_value={"status":"READY","platform":"android","target":"emu"}
+            h.launch_auto(self.root,self.c)
+            self.assertEqual(discovery.call_count,1)
+            self.assertEqual(launch.call_args.args[2:4],("android","emu"))
+            launch.side_effect=h.Blocked("simulator stopped")
+            with self.assertRaisesRegex(h.Blocked,"Pinned runtime failed"):
+                h.launch_auto(self.root,self.c)
+            self.assertEqual(h.pinned_target(self.root),("android","emu"))
+
+    def test_preflight_stops_at_first_success(self):
+        with patch.object(h,"runtime_targets",return_value=[("ios","phone"),("android","emu"),("web",None)]), \
+             patch.object(h,"probe_runtime",return_value=[390,844]) as probe:
+            h.visual_preflight(self.root,self.c)
+            probe.assert_called_once_with(self.root,"ios","phone")
+            self.assertEqual(h.read_json(h.work(self.root)/"visual-preflight.json")["ready"][0]["platform"],"ios")
+
+    def test_required_platform_never_falls_back(self):
+        with patch.object(h,"runtime_targets",return_value=[("android","emu")]) as discovery, \
+             patch.object(h,"probe_runtime",side_effect=h.Blocked("Android unavailable")):
+            with self.assertRaisesRegex(h.Blocked,"No runtime target"):
+                h.launch_auto(self.root,self.c,"android")
+            discovery.assert_called_once_with(self.root,self.c,"android")
+            self.assertIsNone(h.pinned_target(self.root))
+
+    def test_device_preference_and_stable_phone_selection(self):
+        devices=[{"id":"tablet","name":"iPad","targetPlatform":"ios","emulator":True},
+                 {"id":"b","name":"iPhone Z","targetPlatform":"ios","emulator":True},
+                 {"id":"a","name":"iPhone A","targetPlatform":"ios","emulator":True},
+                 {"id":"real","name":"Phone","targetPlatform":"ios","emulator":False},
+                 {"id":"emu","name":"Pixel","targetPlatform":"android-arm64","emulator":True}]
+        with patch.object(h,"run",return_value=json.dumps(devices).encode()),patch.dict(os.environ,{"HARNESS_IOS_DEVICE":""}):
+            self.assertEqual(h.runtime_targets(self.root,self.c),[("ios","a"),("android","emu"),("web",None)])
+        with patch.object(h,"run",return_value=json.dumps(devices[::-1]).encode()),patch.dict(os.environ,{"HARNESS_IOS_DEVICE":"tablet"}):
+            self.assertEqual(h.runtime_targets(self.root,self.c)[0],("ios","tablet"))
 
     def test_candidate_covers_native_and_is_stable_across_commit(self):
         self.write("android/settings.gradle", "first")
