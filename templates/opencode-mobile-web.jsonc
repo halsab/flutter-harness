@@ -45,6 +45,11 @@
           "action": "skill",
           "resource": "*",
           "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 .flutter-harness/bin/harness.py deliver",
+          "effect": "ask"
         }
       ]
     },
@@ -473,7 +478,7 @@
     {
       "action": "shell",
       "resource": "python3 .flutter-harness/bin/harness.py deliver",
-      "effect": "ask"
+      "effect": "deny"
     }
   ]
 }
