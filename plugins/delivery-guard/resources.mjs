@@ -47,7 +47,7 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     }
     const last = attempts.at(-1);
     const lastOutcome = outcomes.at(-1);
-    if (last?.key === key && lastOutcome !== "ERROR") return "Harness: reviewer input unchanged; fix the findings or complete missing evidence before re-review.";
+    if (attempts.some(x=>x.key===key) && !(last?.key===key && lastOutcome==="ERROR")) return "Harness: reviewer input unchanged; fix the findings or complete missing evidence before re-review.";
     if (outcomes.filter(x=>x==="PASS" || x==="CHANGES_REQUIRED").length >= 2)
       return "Harness: substantive reviewer attempt budget exhausted.";
     if (attempts.length >= 2 && !outcomes.some(x=>x==="BLOCKED" || x==="ERROR"))

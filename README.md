@@ -138,3 +138,5 @@ MIT License.
 ### Material UI acceptance
 
 For material visual changes, run `python3 .flutter-harness/bin/harness.py doctor visual` before implementation. Select one working target; a screenshot probe is not a successful app launch. Declare `.flutter-harness/work/visual-plan.json` (platform, fixture, baseline, scenarios with label/kind and Web viewport) per DESIGN.md. Capture each state in both themes using the CLI, optionally with `--scenario` and `--settle`. The quality gate validates exact current evidence before dispatch and binds the independent verdict to image/plan digests as well as source. Two substantive reviews; at most one additional technical recovery. No duplicate unchanged review, no forced PASS. Material component selection and visible selected state are always project defaults.
+
+Baseline evidence is a verified prior-candidate CLI capture on the comparable target/size, or an explicitly documented blocker. Diagnostics includes each retained standard check TSV and unique native launch/scenario log references.

@@ -495,7 +495,8 @@ def visual_preflight(root, c):
             # Raw stderr may contain local details; keep it in the local report,
             # not in the compact exported lifecycle log.
             unavailable.append({"platform": platform, "device": target, "reason": str(exc)[:800]})
-    report = {"status": "PASS" if ready else "BLOCKED", "ready": ready, "unavailable": unavailable}
+    report = {"status": "PASS" if ready else "BLOCKED", "ready": ready, "unavailable": unavailable,
+              "branch":text(git(root,"branch","--show-current")), "digest":fingerprint(root)}
     atomic_json(work(root) / "visual-preflight.json", report)
     event(root, "visual-preflight", ready=[x["platform"] for x in ready],
           unavailable=[x["platform"] for x in unavailable])
@@ -608,9 +609,15 @@ def visual_evidence(root, require_interaction=False):
     plan = read_json(plan_path)
     platform = plan.get("platform")
     require(platform in ("android", "ios", "web"), "Visual plan needs one representative platform")
-    for key in ("fixture", "baseline"):
-        require(isinstance(plan.get(key), str) and plan[key].strip(),
-                "Visual plan needs " + key + " (actual fixture description and comparable baseline path or exact blocker)")
+    require(isinstance(plan.get("fixture"), str) and plan["fixture"].strip(), "Describe representative isolated fixture data")
+    baseline = plan.get("baseline")
+    require(isinstance(baseline, dict), "Declare baseline digest/label or unavailable reason")
+    preflight_path = work(root) / "visual-preflight.json"
+    require(preflight_path.is_file(), "Run doctor visual before runtime work")
+    preflight = read_json(preflight_path)
+    require(preflight.get("status") == "PASS" and preflight.get("branch") == text(git(root,"branch","--show-current")),
+            "Visual preflight missing or from another task branch")
+    require(any(x.get("platform") == platform for x in preflight.get("ready", [])), "Planned platform did not pass runtime preflight")
     scenarios = plan.get("scenarios")
     require(isinstance(scenarios, list) and scenarios and len(scenarios) <= 12,
             "Visual plan needs 1–12 relevant named scenarios")
@@ -655,12 +662,33 @@ def visual_evidence(root, require_interaction=False):
                 f"Theme pair must have equal dimensions and distinct image content: {item['label']}")
         captures.extend(pair)
     require(len(targets) == 1, "All planned evidence must use the same runtime target")
+    target = next(iter(targets))
+    require(platform == "web" or any(x.get("platform") == platform and x.get("device") == target for x in preflight["ready"]),
+            "Native capture target did not pass preflight")
+    baseline_receipt = None
+    if "unavailable" in baseline:
+        require(isinstance(baseline["unavailable"], str) and baseline["unavailable"].strip(), "Explain the actual baseline blocker")
+    else:
+        before = baseline.get("digest")
+        label = baseline.get("label")
+        require(isinstance(before,str) and re.fullmatch(r"[0-9a-f]{64}",before) and before != digest and
+                isinstance(label,str) and re.fullmatch(r"[a-zA-Z0-9_-]+",label), "Invalid baseline candidate/label")
+        image = root / ".flutter-harness/previews" / before / (label+"-"+platform+"-light.png")
+        require(image.is_file() and image.with_suffix(".json").is_file(), "Missing comparable baseline capture receipt")
+        meta = read_json(image.with_suffix(".json"))
+        data = image.read_bytes()
+        first = next(x for x in captures if x["label"] == next(s["label"] for s in scenarios if s["kind"]=="screen") and x["theme"]=="light")
+        require(all(meta.get(k)==v for k,v in {"digest":before,"label":label,"platform":platform,"theme":"light",
+                "sha256":hashlib.sha256(data).hexdigest(),"size":png_size(data),"viewport":first.get("viewport")}.items()) and
+                png_size(data)==first["size"] and (platform=="web" or meta.get("target")==target),
+                "Baseline capture is stale or not comparable to final screen")
+        baseline_receipt = {**meta,"path":str(image)}
     require(fingerprint(root) == digest, "Candidate changed while verifying images")
     # Bind review to the exact declared plan and validated image contents.
-    evidence_digest = manifest_digest({"plan": plan, "captures": [
+    evidence_digest = manifest_digest({"plan": plan, "baseline_sha256": (baseline_receipt or {}).get("sha256"), "captures": [
         {k:v for k,v in item.items() if k != "path"} for item in captures]})
     result = {"status":"PASS", "digest":digest, "evidence_digest":evidence_digest,
-              "captures":captures, "plan":plan}
+              "captures":captures, "plan":plan, "baseline":baseline_receipt}
     output(**result)
     return result
 
@@ -726,6 +754,18 @@ def diagnostics(root, sessions):
                     for start, end in summary["session_windows"]):
                 events.append(item)
     data["events"] = events
+    # Preserve the actual status/exit of each standard check, including failed runs.
+    reports = []
+    for item in events:
+        if item.get("stage") != "check-run":
+            continue
+        directory = (root / item.get("artifacts","")).resolve()
+        if work(root).resolve() not in directory.parents:
+            continue
+        for path in directory.glob("check-*.tsv"):
+            with path.open(encoding="utf-8") as stream:
+                reports.append({"report":str(path.relative_to(root)), "checks":list(csv.DictReader(stream,delimiter="\t"))})
+    data["standard_runs"] = reports
     target = work(root) / "diagnostics.json"
     atomic_json(target, data)
     output(status="PASS", report=str(target))

@@ -135,9 +135,10 @@ class Lifecycle(unittest.TestCase):
         digest = h.fingerprint(self.root)
         folder = self.root/".flutter-harness/previews"/digest
         folder.mkdir(parents=True)
-        plan = {"platform":"android","fixture":"mixed short/long realistic records","baseline":"not available: new screen",
+        plan = {"platform":"android","fixture":"mixed short/long realistic records","baseline":{"unavailable":"new screen"},
                 "scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction"}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json", plan)
+        h.atomic_json(h.work(self.root)/"visual-preflight.json", {"status":"PASS","branch":"feature/test","ready":[{"platform":"android","device":"emulator"}]})
         def write(label, theme, suffix):
             p = folder/(label+"-android-"+theme+".png")
             data = h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"+suffix
@@ -158,6 +159,12 @@ class Lifecycle(unittest.TestCase):
             h.visual_evidence(self.root, True)
         write("menu","dark",b"dark")
         first=h.visual_evidence(self.root, True)["evidence_digest"]
+        preflight = h.work(self.root)/"visual-preflight.json"
+        saved = preflight.read_bytes()
+        preflight.unlink()
+        with self.assertRaisesRegex(h.Blocked,"doctor visual"):
+            h.visual_evidence(self.root, True)
+        preflight.write_bytes(saved)
         write("menu","dark",b"new dark")
         self.assertNotEqual(first,h.visual_evidence(self.root, True)["evidence_digest"])
         (folder/"menu-android-dark.png").write_bytes(b"changed")
