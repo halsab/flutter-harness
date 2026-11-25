@@ -253,7 +253,7 @@ class Lifecycle(unittest.TestCase):
         self.write("lib/main.dart","new")
         self.receipt(["lib/main.dart"])
         real = h.run
-        state = {"exists":False,"create":0,"edit":0,"push":0,"body":"","title":"","head":"","url":"https://github.com/owner/demo/pull/1"}
+        state = {"exists":False,"create":0,"edit":0,"push":0,"body":"","title":"","head":"","url":"https://github.com/owner/demo/pull/1","timeout_after_create":False}
         def mocked(root,*args,**kwargs):
             if args[0] != "gh":
                 if args[:2] == ("git", "push"):
@@ -275,6 +275,8 @@ class Lifecycle(unittest.TestCase):
                 state["head"] = self.git("rev-parse", "HEAD")
                 state["title"] = args[args.index("--title")+1]
                 state["body"] = Path(args[args.index("--body-file")+1]).read_text()
+                if state["timeout_after_create"]:
+                    raise subprocess.TimeoutExpired(args, 60)
                 return b""
             if cmd == "edit":
                 state["edit"] += 1
@@ -293,6 +295,20 @@ class Lifecycle(unittest.TestCase):
             with self.assertRaises(h.DeliveryBlocked) as error:
                 h.completion(self.root,self.c)
             self.assertEqual(error.exception.code, "PR_CREATE_TRANSIENT")
+            # The CLI exposes the structured cause to OpenCode without network calls.
+            import sys
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with patch.object(sys,"argv",["harness.py","--project",str(self.root),"completion"]), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                self.assertEqual(h.main(),3)
+            self.assertEqual(json.loads(stdout.getvalue())["error"]["code"],"PR_CREATE_TRANSIENT")
+            self.assertIn("PR_CREATE temporarily unavailable",stderr.getvalue())
+            # A different manifest must not inherit a previous attempt's failure.
+            manifest_path = h.work(self.root)/"delivery.json"
+            manifest = h.read_json(manifest_path)
+            h.atomic_json(manifest_path,{**manifest,"title":"Changed"})
+            with self.assertRaisesRegex(h.Blocked,"Missing delivery-result"):
+                h.completion(self.root,self.c)
+            h.atomic_json(manifest_path,manifest)
             h.deliver(self.root,self.c)
             with patch.object(h,"canonical_repo",side_effect=AssertionError("completion must stay offline")):
                 result = h.completion(self.root,self.c)
@@ -328,6 +344,21 @@ class Lifecycle(unittest.TestCase):
             self.assertEqual(state["push"],2)
             state["url"] = "https://github.com/owner/demo/pull/1"
             h.deliver(self.root,self.c)
+            self.assertEqual(h.completion(self.root,self.c)["head"],head)
+            # Simulate an ambiguous create: GitHub created the PR, but the CLI timed out.
+            (h.work(self.root)/"delivery-result.json").unlink()
+            state["exists"] = False
+            state["timeout_after_create"] = True
+            with self.assertRaises(h.DeliveryBlocked) as error:
+                h.deliver(self.root,self.c)
+            self.assertEqual(error.exception.code,"PR_CREATE_TIMEOUT")
+            self.assertTrue(error.exception.retryable)
+            self.assertTrue(state["exists"])
+            self.assertEqual(state["create"],3)
+            self.assertEqual(state["push"],3)
+            h.deliver(self.root,self.c)
+            self.assertEqual(state["create"],3)
+            self.assertEqual(state["push"],3)
             self.assertEqual(h.completion(self.root,self.c)["head"],head)
             self.write("lib/main.dart", "newer")
             with self.assertRaisesRegex(h.Blocked, "Uncommitted"):

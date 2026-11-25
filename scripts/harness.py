@@ -47,7 +47,8 @@ def remote_call(operation, fn, *args, **kwargs):
                               operation + " timed out; reconcile remote state", True) from exc
     except Blocked as exc:
         detail = str(exc).lower()
-        if re.search(r"rate limit|http 429|http 5[0-9]{2}|temporary|temporarily|timed? out|timeout|connection (?:reset|refused|closed)|could not resolve host|network is unreachable|service unavailable|bad gateway|unexpected eof", detail):
+        if (operation == "PR_CREATE" and "already exists" in detail) or re.search(
+                r"rate limit|http 429|http 5[0-9]{2}|temporary|temporarily|timed? out|timeout|connection (?:reset|refused|closed)|could not resolve host|network is unreachable|service unavailable|bad gateway|unexpected eof", detail):
             raise DeliveryBlocked(operation + "_TRANSIENT",
                                   operation + " temporarily unavailable; reconcile remote state", True) from exc
         if re.search(r"authentication|not authenticated|not logged|permission denied|forbidden|http 40[13]|bad credentials|gh auth login|could not read username", detail):
@@ -412,19 +413,21 @@ def pr_list(root, repo, name):
                           "--head", name, "--state", "open",
                           "--json", "number,baseRefName,headRefName,headRepositoryOwner,isCrossRepository,isDraft,headRefOid,state,url,title,body",
                           capture=True, timeout=60))
-    require(isinstance(data, list), "Invalid GitHub PR response")
+    if not isinstance(data, list) or not all(isinstance(p, dict) for p in data):
+        raise DeliveryBlocked("PR_RESPONSE", "Invalid GitHub PR response")
     own = [p for p in data if p.get("headRefName") == name and
-           not p.get("isCrossRepository") and
+           p.get("isCrossRepository") is False and
            (p.get("headRepositoryOwner") or {}).get("login", "").lower() ==
            repo.split("/")[0].lower()]
-    require(len(own) <= 1, "Multiple PRs for this branch")
+    if len(own) > 1:
+        raise DeliveryBlocked("PR_MULTIPLE", "Multiple PRs for this branch")
     return own[0] if own else None
 
 
 def validate_remote_pr(pr, repo, base, name, head):
     if not (pr and pr.get("state") == "OPEN" and pr.get("baseRefName") == base and
             pr.get("headRefName") == name and pr.get("headRefOid") == head and
-            not pr.get("isCrossRepository") and not pr.get("isDraft")):
+            pr.get("isCrossRepository") is False and pr.get("isDraft") is False):
         raise DeliveryBlocked("PR_IDENTITY_MISMATCH",
                               "PR missing, draft, stale, closed, cross-repo or targets the wrong branch")
     if not valid_pr_url(pr.get("url"), repo, pr.get("number")):
@@ -581,10 +584,10 @@ def _deliver(root, c, state):
     manifest = delivery_manifest(root,c)
     identity = {"branch": name, "base": c["integration_branch"], "digest": digest,
                 "revision": c["revision"], "manifest_digest": manifest_digest(manifest),
-                "checked_at": receipt.get("checked_at")}
+                "checked_at": receipt.get("checked_at"), "head": text(git(root, "rev-parse", "HEAD"))}
     def checkpoint(stage, **extra):
         state.clear()
-        state.update({**identity, "stage": stage, "head": text(git(root, "rev-parse", "HEAD")), **extra})
+        state.update({**identity, "stage": stage, **extra})
         atomic_json(work(root) / "delivery-state.json", state)
         event(root, stage, **{k: v for k, v in state.items() if k != "stage"})
     checkpoint("delivery-started")
@@ -611,8 +614,11 @@ def _deliver(root, c, state):
             "Integration branch advanced; reconcile and recheck")
     require(fingerprint(root) == digest, "Candidate changed before publication")
     existing = remote_call("PR_LIST", pr_list, root, repo, name)
-    require(not existing or existing.get("baseRefName") == base,
-            "Existing PR targets another base")
+    if existing:
+        if existing.get("baseRefName") != base:
+            raise DeliveryBlocked("PR_BASE_MISMATCH", "Existing PR targets another base")
+        if not valid_pr_url(existing.get("url"), repo, existing.get("number")):
+            raise DeliveryBlocked("PR_URL_MISMATCH", "Unexpected PR URL for canonical repository and PR number")
     checkpoint("delivery-validated")
     if changed:
         git(root, "--literal-pathspecs", "add", "-A", "--", *files)
@@ -628,6 +634,7 @@ def _deliver(root, c, state):
     require(git(root, "diff", "--name-only", "origin/" + base, "HEAD"),
             "No task change to publish")
     head = text(git(root, "rev-parse", "HEAD"))
+    identity["head"] = head
     checkpoint("delivery-committed", head=head)
     body = work(root) / "pr-body.md"
     summary = ["", "", "## Harness evidence (generated)", f"- Harness revision: {c['revision']}", f"- Candidate: {digest}", "- Standard check: PASS"]
@@ -660,6 +667,8 @@ def _deliver(root, c, state):
             remote_call("PR_CREATE", run, root, "gh", "pr", "create", "--repo", repo, "--base", base,
                         "--head", name, "--title", manifest["title"], "--body-file", str(body), capture=True, timeout=60)
         existing = remote_call("PR_LIST", pr_list, root, repo, name)
+        if not existing:
+            raise DeliveryBlocked("PR_NOT_VISIBLE", "Published PR not yet visible; reconcile remote state", True)
     pr = validate_remote_pr(existing, repo, base, name, head)
     require(matching(pr), "Remote PR metadata differs from delivery manifest")
     checkpoint("delivery-remote-verified", head=head, pr=pr["url"])
@@ -1376,6 +1385,9 @@ def main():
                 pass
         if a.command == "completion" and isinstance(exc, DeliveryBlocked):
             output(status="BLOCKED", stage=exc.stage, error=exc.details())
+        if a.command == "deliver" and isinstance(exc, DeliveryBlocked) and isinstance(exc.__cause__, Blocked):
+            # Original command output stays in the local terminal, not shareable lifecycle evidence.
+            print("Local command: " + str(exc.__cause__), file=sys.stderr)
         print(f"BLOCKED: {exc}", file=sys.stderr)
         return 3
 
