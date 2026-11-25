@@ -9,7 +9,7 @@ async function fixture() {
     tool:{hook:async(n,f)=>{hooks[n]=f;}}};
   let inputKey=0, ready=true;
   ctx.session.context=async({sessionID})=>[{type:"assistant",content:[{type:"text",text:"VERDICT: "+(sessions.get(sessionID).verdict || "CHANGES_REQUIRED")}]}];
-  const guard=await registerResourceGuard(ctx,id=>"task/"+id,async()=>{if(!ready)throw Error("missing evidence");return {key:String(inputKey)};},async()=>{});
+  const guard=await registerResourceGuard(ctx,id=>"task/"+id,async()=>{if(!ready)throw Error("missing evidence");return {key:String(inputKey)};},async(e,input)=>{if(input.dispute)e.input.dispute=input.dispute;});
   let i=0;
   const call=async(agent,sessionID="main",model)=>{
     const e={tool:"subagent",sessionID,id:"call"+(++i),input:{agent,model}};
@@ -64,4 +64,16 @@ test("missing evidence spends no review; changed evidence after BLOCKED allows b
   advance(); await finish(await call("reviewer"),"r3");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3"]);
+});
+
+test("one unchanged-input adjudication carries actual findings, then stops or permits targeted repair",async()=>{
+  const {call,finish,advance}=await fixture();
+  await finish(await call("reviewer"),"r1");
+  const second=await call("reviewer");
+  assert.equal(second.input.dispute.childID,"r1");
+  assert.match(second.input.dispute.report,/CHANGES_REQUIRED/);
+  await finish(second,"r2");
+  await assert.rejects(call("reviewer"),/unchanged/);
+  advance(); await finish(await call("reviewer"),"r3");
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });

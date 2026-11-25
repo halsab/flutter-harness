@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { registerResourceGuard } from "../plugins/delivery-guard/resources.mjs";
-import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel } from "../plugins/delivery-guard/quality.mjs";
+import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel, resolvedDispute } from "../plugins/delivery-guard/quality.mjs";
 
 test("risk detection follows actual repository changes, not routine UI wording", () => {
   assert.ok(classify(["lib/data/task_repository.dart"], "routine UI change").length);
@@ -215,7 +215,7 @@ test("combined production hooks reserve no reviewer before evidence and bind act
   await mkdir(join(root,".flutter-harness/work"),{recursive:true});
   await writeFile(join(root,".flutter-harness/work/delivery.json"),JSON.stringify({visual_required:true,visual_interaction:true}));
   const hooks={}, children=new Map([["main",{}]]);
-  let ready=false, manifestReady=false, visualDigest="one", quality;
+  let ready=false, manifestReady=false, currentReceipt=false, visualDigest="one", quality;
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     tool:{hook:async(n,f)=>(hooks[n]??=[]).push(f)},
@@ -227,13 +227,15 @@ test("combined production hooks reserve no reviewer before evidence and bind act
     assert.equal(interaction,true);
     if(!ready)throw Error("missing menu");
     return {evidence_digest:visualDigest,captures:[{path:"menu.png"}]};
-  },resources.status,true,resources.reviewAvailability,async()=>{if(!manifestReady)throw Error("invalid required_e2e");});
+  },resources.status,true,resources.reviewAvailability,async()=>{if(!manifestReady)throw Error("invalid required_e2e");},async()=>currentReceipt);
   const emit=async(n,e)=>{for(const f of hooks[n]) await f(e);};
   const review={tool:"subagent",sessionID:"main",id:"r",input:{agent:"reviewer",prompt:"Review"}};
   await assert.rejects(emit("execute.before",review),/standard check/);
   const check={tool:"shell",sessionID:"main",id:"c",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await emit("execute.before",check);
   await emit("execute.after",{...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
+  await assert.rejects(emit("execute.before",review),/standard check/);
+  currentReceipt=true;
   await assert.rejects(emit("execute.before",review),/invalid required_e2e/);
   assert.match(await quality.reason("main"),/Prepare valid delivery manifest/);
   manifestReady=true;
@@ -246,6 +248,9 @@ test("combined production hooks reserve no reviewer before evidence and bind act
   children.set("child",{parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}});
   await emit("execute.after",{...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.equal(await quality.reason("main"),"");
+  currentReceipt=false;
+  assert.match(await quality.reason("main"),/receipt absent or stale/);
+  currentReceipt=true;
   visualDigest="two";
   assert.match(await quality.reason("main"),/reviewer verdict/);
 });
@@ -254,4 +259,11 @@ test("focused visual review uses Medium but structural and broad work remains Hi
   assert.equal(reviewEffort({files:2,lines:110},["material UI redesign or design-system change"]),"medium");
   assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"high");
   assert.equal(reviewEffort({files:1,lines:20},["persistent data, storage or sensitive operation changed"]),"high");
+});
+
+test("disputed acceptance requires explicit resolution of prior findings",()=>{
+ const m=text=>[{type:"assistant",content:[{type:"text",text}]}];
+ assert.equal(resolvedDispute(m("VISUAL: PASS\nVERDICT: PASS")),false);
+ assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVISUAL: PASS\nVERDICT: PASS")),true);
+ assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVERDICT: CHANGES_REQUIRED")),false);
 });

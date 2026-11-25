@@ -150,3 +150,7 @@ Use `launch auto --only android|ios|web` when the requested change actually requ
 ### Focused task cycle
 
 Use begin once, baseline launch, focused implementation/test changes, prepare-delivery, canonical check, launch auto, scripted capture-plan (or manual inspected capture), review and deliver. `prepare-delivery` writes a typed manifest and exact dirty paths; `validate-delivery` validates without GitHub writes before managed reviewer dispatch. `launch auto` refuses unchecked changed candidates and can reuse a pinned identical native launch; use --fresh if actual UI needs relaunch. Device probe is not foreground app proof. No reduced acceptance or automatic merge.
+
+### Owner workspaces (Single / Parallel)
+
+Create up to three task worktrees and reserve iOS → Android → Web, then run one OpenCode TUI per worktree. Verify cumulative PR prefixes before manually merging in order. See [Worktree workflow](docs/worktrees.md). No model orchestration or auto-merge.

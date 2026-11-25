@@ -27,6 +27,9 @@ class Lifecycle(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "app"
         self.root.mkdir()
+        slots=patch.object(h,"slot_path",side_effect=lambda platform:self.root.parent/"slots"/(platform+".json"))
+        slots.start()
+        self.addCleanup(slots.stop)
         self.remote = self.root.parent / "remote.git"
         self.git("init", "-b", "trunk")
         self.git("config", "user.name", "Harness")
@@ -81,6 +84,30 @@ class Lifecycle(unittest.TestCase):
         with self.assertRaisesRegex(h.Blocked,"Managed Harness file differs"):
             h.installed_revision(self.root,self.c)
 
+    def test_diagnostics_without_session_export(self):
+        h.event(self.root,"task-start",session="ses_fixture")
+        h.event(self.root,"check-run",artifacts=".flutter-harness/work/standard-fixture")
+        self.write(".flutter-harness/work/standard-fixture/check-fixture.tsv","check\tstatus\texit_code\nflutter-tests\tTIMEOUT\t124\n")
+        with patch.object(h,"usage",side_effect=h.Blocked("export unavailable")):
+            h.diagnostics(self.root,[])
+        data=h.read_json(h.work(self.root)/"diagnostics.json")
+        self.assertEqual(data["usage_status"],"UNAVAILABLE")
+        self.assertEqual(data["standard_runs"][0]["checks"][0]["status"],"TIMEOUT")
+        self.assertFalse(data["check_running"])
+        with patch.object(h,"usage") as exporter:
+            h.diagnostics(self.root,["ses_fixture"],local_only=True)
+            exporter.assert_not_called()
+        self.assertEqual(h.read_json(h.work(self.root)/"diagnostics.json")["usage_status"],"NOT_REQUESTED")
+
+    def test_check_cannot_run_concurrently(self):
+        with (h.work(self.root)/"check.lock").open("a") as lock:
+            h.fcntl.flock(lock,h.fcntl.LOCK_EX|h.fcntl.LOCK_NB)
+            self.receipt(["lib/main.dart"])
+            self.assertFalse(h.current_check(self.root,h.fingerprint(self.root)))
+            with self.assertRaisesRegex(h.Blocked,"already running"):
+                h.check(self.root,self.c)
+        self.assertTrue(h.current_check(self.root,h.fingerprint(self.root)))
+
     def test_duplicate_begin_keeps_task_receipt(self):
         path = h.work(self.root)/"task.json"
         before = path.read_bytes()
@@ -103,6 +130,28 @@ class Lifecycle(unittest.TestCase):
             launch.return_value={"status":"READY","platform":"ios","target":"phone"}
             h.launch_auto(self.root,self.c,fresh=True)
             launch.assert_called_once()
+
+    def test_baseline_captured_before_source_edit(self):
+        task=h.read_json(h.work(self.root)/"task.json")
+        h.atomic_json(h.work(self.root)/"runtime.json",{"digest":task["baseline_digest"],"platform":"ios","device":"phone"})
+        with patch.object(h,"capture") as cap:
+            value=h.capture_baseline(self.root,task,"ios")
+            cap.assert_called_once_with(self.root,"ios","baseline","light","390,844")
+            self.assertEqual(value["digest"],task["baseline_digest"])
+            self.write("lib/main.dart","changed")
+            with self.assertRaisesRegex(h.Blocked,"after source edits"):
+                h.capture_baseline(self.root,task,"ios")
+
+    def test_capture_reuse_requires_exact_image_and_scenario(self):
+        p=self.write(".flutter-harness/work/capture.png","")
+        data=h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"+b"crc!"
+        p.write_bytes(data)
+        expected={"scenario_sha256":"abc","digest":"candidate"}
+        h.atomic_json(p.with_suffix(".json"),{**expected,"size":[390,844],"sha256":hashlib.sha256(data).hexdigest()})
+        self.assertTrue(h.reusable_capture(p,expected))
+        self.assertFalse(h.reusable_capture(p,{**expected,"scenario_sha256":"other"}))
+        p.write_bytes(data+b"x")
+        self.assertFalse(h.reusable_capture(p,expected))
 
     def test_capture_plan_runs_scripted_states_serially(self):
         self.write("maestro/screen.yaml","appId: dev.test\n---\n- launchApp\n")
@@ -274,6 +323,19 @@ class Lifecycle(unittest.TestCase):
             h.atomic_json(p.with_suffix(".json"),{"digest":digest,"label":label,"platform":"android","target":"emulator",
                 "theme":theme,"size":[390,844],"viewport":None,"sha256":hashlib.sha256(data).hexdigest()})
         return folder, write
+
+    def test_visual_rejects_unrelated_baseline(self):
+        self.write("lib/main.dart","new candidate")
+        folder,write=self.visual_fixture()
+        for label in ("final","menu"):
+            for theme in ("light","dark"):
+                write(label,theme,theme.encode())
+        path=h.work(self.root)/"visual-plan.json"
+        plan=h.read_json(path)
+        plan["baseline"]={"digest":"a"*64,"label":"baseline"}
+        h.atomic_json(path,plan)
+        with self.assertRaisesRegex(h.Blocked,"original candidate"):
+            h.visual_evidence(self.root,True)
 
     def test_visual_requires_current_complete_distinct_pairs(self):
         folder, write = self.visual_fixture()
