@@ -114,14 +114,20 @@ default. Prefer existing project conventions and direct Flutter/Dart tooling.
 
 ## Lean context (default for new installations)
 
-The generated AGENTS.md block is the compact delivery workflow. In an active
-product, isolated fixes and ordinary features do not require opening the full
-flutter-harness skill. Load it for pending or unknown foundation adoption,
-substantial UI/architecture work, interacting behavior, high risk, multi-slice
-work or difficult recovery. Use the specific BEHAVIOR, DESIGN and ORCHESTRATION
-guides only when their triggers apply. Existing product standards, required
-checks and plugin delivery/risk gates remain in force; uncertainty selects
-the full workflow.
+The generated AGENTS.md block is the compact delivery workflow. Zero skills
+by default: the first-party skill remains installed for compatibility and
+optional focused risk guidance, not as a mandatory workflow. Read the relevant
+PRODUCT, BEHAVIOR, DESIGN or ORCHESTRATION guide directly when its trigger
+applies. Existing product standards, required checks and plugin gates remain
+in force.
+
+Script-first is the architectural rule: use native CLI and existing scripts
+for reproducible actions, profile selection, tests, state checks and PR
+verification. Prefer exit codes and compact structured results, keep detailed
+logs on disk. Use the model for intent, implementation, design, semantic review
+and diagnosis. Do not add a new controller, dependency or duplicate CLI wrapper
+without a concrete gap. Deterministic predicates are not proof of semantic
+correctness; keep required human approval and risk-based review.
 
 This is an evidence-informed default, not a measured Flutter speedup:
 [Evaluating AGENTS.md](https://arxiv.org/abs/2602.11988) found higher inference
@@ -133,7 +139,8 @@ budget-aware component selection.
 Existing installations are preserved by install.sh. Review and replace only
 the managed Flutter Harness block between its start/end markers using the
 new block in scripts/install.sh; leave project-specific instructions intact.
-Do not overwrite existing product policy, skill files or OpenCode config.
+Review and sync the shortened first-party skill and updated check.sh explicitly
+where appropriate; do not overwrite project-specific policies or OpenCode config.
 
 For initial live validation, use normal Lab tasks rather than a new benchmark
 suite: one isolated fix, one routine feature with a meaningful assertion, and
@@ -144,10 +151,13 @@ are smoke trials, not statistical evidence of improvement.
 ## Verify
 
 ```bash
-bash scripts/check.sh /absolute/path/to/flutter-project standard mobile
-bash scripts/check.sh /absolute/path/to/flutter-project full mobile-web
+bash scripts/check.sh /absolute/path/to/flutter-project standard
+bash scripts/check.sh /absolute/path/to/flutter-project full
 ```
 
+The runner reads the installed profile when omitted (legacy uninstalled projects
+default to mobile; explicit profile overrides remain supported). Invalid
+installed profiles block execution rather than silently selecting a platform.
 The bootstrap verifier reports format, analyzer, Flutter tests and optional
 full builds. It writes logs and TSV summaries inside
 `~/.cache/flutter-harness/<project-name>/` by default (or `HARNESS_ARTIFACTS_DIR`). This keeps the clean lab worktree untouched. **It does not run Maestro UI flows, Web E2E or Dart MCP diagnostics**;
