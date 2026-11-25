@@ -81,6 +81,27 @@ async function fixture(t) {
   await writeFile(join(root,"lib/data/task_repository.dart"),"void deleteCompletedTasks() {}\n");
   return {root,git};
 }
+test("destructive code in an untracked source has the same risk before and after staging/commit", async t => {
+  const {root,git}=await fixture(t);
+  await writeFile(join(root,"lib/data/task_repository.dart"),"void old() {}\n");
+  const dir=join(root,"lib/features/tasks/view_models");
+  await mkdir(dir,{recursive:true});
+  await writeFile(join(dir,"actions.dart"),"void reset(Store store) { store.clearAll(); }\n");
+  const before=await candidate(root,"app","");
+  assert.deepEqual(before.reasons,["destructive or bulk operation"]);
+  assert.equal(before.effort,"high");
+  git("add",".");
+  const staged=await candidate(root,"app","");
+  git("commit","-qm","new operation");
+  const committed=await candidate(root,"app","");
+  for (const next of [staged,committed]) {
+    assert.deepEqual(next.reasons,before.reasons);
+    assert.equal(next.digest,before.digest);
+    assert.equal(next.effort,before.effort);
+    assert.deepEqual(next.size,before.size);
+  }
+});
+
 test("candidate is stable across commit, records removed failed-test name, and invalidates on edit", async t => {
   const {root,git}=await fixture(t);
   const path=join(root,"test/task_test.dart");
@@ -136,6 +157,10 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
   const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review diff"}};
   await hooks["execute.before"](review);
   assert.match(review.input.prompt,/VERDICT: PASS/);
+  assert.match(review.input.prompt,/violated requirement\/invariant/);
+  assert.match(review.input.prompt,/expected vs actual behavior/);
+  assert.match(review.input.prompt,/do not claim to have executed it/);
+  assert.match(review.input.prompt,/nonblocking preferences/);
   assert.equal(review.input.model,"openai/gpt-6-luna#high");
   await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.equal((await publish()).effect,"deny");

@@ -109,10 +109,14 @@ export async function candidate(root, base, request, failedNames = []) {
     if (!match || !measuredSet.has(match[3])) continue;
     lines += match[1] === "-" || match[2] === "-" ? 401 : Number(match[1]) + Number(match[2]);
   }
+  const newSource = [];
   for (const path of untracked.filter(p => measuredSet.has(p))) {
     const data = await readFile(join(root, path));
     if (data.includes(0)) { lines += 401; continue; }
     const source = data.toString("utf8");
+    // git diff does not include untracked files; inspect the same added code
+    // before staging as after staging/commit to keep the risk gate stable.
+    if (path.startsWith("lib/")) newSource.push(source);
     if (source.length) lines += source.split("\n").length - (source.endsWith("\n") ? 1 : 0);
   }
   const size = { files: measured.length, lines };
@@ -135,7 +139,7 @@ export async function candidate(root, base, request, failedNames = []) {
   const removed = unique(failedNames.filter(n => !names.includes(n)));
   const diff = await git(root, ["diff", "--unified=0", mergeBase, "--", "lib"]);
   const additions = diff.split("\n").filter(line => line.startsWith("+") && !line.startsWith("+++")).join("\n");
-  const reasons = classify(changed, request, removed, additions);
+  const reasons = classify(changed, request, removed, [additions, ...newSource].join("\n"));
   if (changed.some(p => /^(android|ios|web)\//.test(p))) reasons.push("native or web platform configuration changed");
   let product = false;
   try { await readFile(join(root, ".flutter-harness/product.json")); product = true; }
@@ -244,6 +248,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
       "Original requirement: " + (v.task.request || "(see task prompt)"),
       "Check the behavior contract in docs/product when applicable against the original request, including interacting state and acceptance examples. A green test of an incorrect rule is not acceptance.",
       "Risk flags: " + (v.change.reasons.join("; ") || "requested review"),
+      "Evidence-based review: every blocking finding must identify the violated requirement/invariant, file or observed runtime state, concrete reachable failure scenario, expected vs actual behavior, impact and evidence. Cite a source-level proof, existing executable result or supplied runtime capture. If reproduction is needed, give the Build parent the smallest exact test/scenario to run; do not claim to have executed it. Distinguish proven defects from hypotheses and nonblocking preferences. Missing essential evidence is BLOCKED, not CHANGES_REQUIRED; PASS may include optional improvements. Keep only distinct material findings; do not require speculative refactors or a new review cycle for preferences.",
       v.change.removed.length ? "Tests removed after a failed run: " + v.change.removed.join("; ") : "",
       v.change.reasons.some(r => /persistent data|destructive|tests disappeared/.test(r)) ? "For rejected persistence writes, verify the real repository against a seeded storage double that rejects only the write, not a replacement empty store. Assert reload and preserved records. Reject unsupported claims, missing important assertions, and removed failing tests without a valid replacement." : "Reject unsupported claims and missing important assertions. Compare changed tests to original regression invariants, including overlapping async operations, repeated submission, error recovery and navigation during pending writes.",
       v.change.reasons.includes(visualRisk) ? "For a focused change, judge only the requested outcome and material regressions; do not require a full redesign. Verify new interaction state transitions with meaningful executable tests, not only adapted locators. Reject unjustified nonstandard Material patterns, unclear selected mode/criterion/direction, redundant persistent controls and inaccessible states as material defects. Apply the visual acceptance checklist in .flutter-harness/templates/product/DESIGN.md. Actually open the final populated runtime captures and the baseline when available, compare at comparable viewport/content, and name the evidence and concrete differences. Inspect the visual plan, content start/density, persistent controls and secondary actions, readable long labels, selected state, changed interaction, and both themes when required. For a broad redesign, require a justified hierarchy and material improvement over a comparable baseline. For a focused change, require the requested outcome and no concrete material regression; unrelated improvements are not prerequisites. If required captures cannot be inspected, report VERDICT: BLOCKED; if a material visual defect remains, report VISUAL: CHANGES_REQUIRED followed by VERDICT: CHANGES_REQUIRED. On visual acceptance end with VISUAL: PASS on the line immediately before VERDICT: PASS. A logic-only recheck may reuse unchanged, actually inspected visual evidence. No screenshots are needed for architecture-only work." : "",
