@@ -13,15 +13,13 @@ No automatic merge, additional skills, default MCP or worker swarm.
    add a custom deterministic check only for a reusable, observable invariant
    that the existing mechanisms cannot enforce. Test a failing case and a valid
    case; avoid rules that merely encode one app's product choices.
-4. Keep application-specific tests and contracts in the app. If a confirmed
-   failure exposes a reusable Harness gap, record a short section in the
-   existing task PR (failure, cause, proposed protection, evidence). No
-   mandatory report, additional model call, managed-file edits or new gate.
-5. The maintainer triages the lesson in a separate Harness change, reproduces
-   it with a fixture, implements the smallest correction, runs existing CI,
-   and removes superseded rules where their guarantees are demonstrably
-   preserved. Roll out through the existing managed installer after approval.
-   Do not silently self-modify an installed Harness.
+4. Keep app-specific tests and contracts in the app. Use the installed Reporter
+   for confirmed reusable gaps; selected delivery errors are captured directly.
+   No mandatory reflection call, managed-file edits or new delivery gate.
+5. Central Evolution processes validated owner reports and may propose a
+   separate regression-tested Harness PR. Unreproduced reports stay open.
+   Roll out through the existing managed installer after owner approval.
+   Do not silently self-modify an installed Harness. See [automation](evolution-automation.md).
 
 Example: missing data and corrupted persisted data must not share a success
 result when loss is possible. Fix the app repository contract and seed a

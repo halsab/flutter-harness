@@ -5,3 +5,5 @@ One task, one ordinary Git branch, one Build agent. OpenCode handles semantic wo
 ## Engineering evolution
 
 Prefer guarantees in domain types/APIs and existing analyzer/tests before custom checks, then scoped semantic review and concise instructions. Keep publication safeguards independent. Confirmed recurring defects are inputs to the smallest durable improvement, not automatic justification for a new agent, hook or document. See [engineering-evolution.md](engineering-evolution.md) for ownership and evaluation.
+
+The installed Reporter sends only catalogued, schema-validated failure codes to central owner Issues. A separately enabled central Evolution workflow proposes regression-tested fixes; it does not inspect product repositories or modify installed Harness in place.
