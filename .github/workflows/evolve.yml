@@ -18,6 +18,10 @@ jobs:
     if: github.repository == 'halsab/flutter-harness' && github.actor == github.repository_owner && vars.HARNESS_EVOLUTION_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     outputs:
       ready: ${{ steps.prepare.outputs.ready }}
       number: ${{ steps.prepare.outputs.number }}

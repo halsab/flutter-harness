@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -108,3 +109,35 @@ class PatchBoundary(unittest.TestCase):
         with patch.object(evolution, "git", side_effect=[b"scripts/test_harness.py\0", b":100644 120000 aaa bbb T\tscripts/test_harness.py\n"]):
             with self.assertRaises(ValueError):
                 evolution.validate_staged()
+
+
+    def test_real_git_regression_proof_requires_failure_before_fix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            def git(*args):
+                subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+            git("init", "-q", "-b", "main")
+            git("config", "user.name", "Fixture")
+            git("config", "user.email", "fixture@example.invalid")
+            (scripts / "demo.py").write_text("def value(): return 1\n")
+            original = ("import unittest\nfrom demo import value\n"
+                        "class Demo(unittest.TestCase):\n"
+                        "    def test_existing(self): self.assertGreater(value(), 0)\n")
+            tests = scripts / "test_demo.py"
+            tests.write_text(original)
+            git("add", ".")
+            git("commit", "-qm", "baseline")
+            (scripts / "demo.py").write_text("def value(): return 2\n")
+            tests.write_text(original + "    def test_regression(self): self.assertEqual(value(), 2)\n")
+            git("add", "scripts")
+            cmd = [sys.executable, str(Path(evolution.__file__).resolve()), "prove-regression"]
+            result = subprocess.run(cmd, cwd=root, capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("PASS regression", result.stdout)
+            self.assertEqual(evolution.test_result(root, "scripts/test_demo.py"), 0)
+            tests.write_text(original + "    def test_non_regression(self): self.assertGreater(value(), 0)\n")
+            git("add", "scripts")
+            result = subprocess.run(cmd, cwd=root, capture_output=True, text=True, timeout=60)
+            self.assertNotEqual(result.returncode, 0)
