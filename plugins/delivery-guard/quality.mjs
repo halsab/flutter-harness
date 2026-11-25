@@ -208,7 +208,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     const currentCheck = await checked(v);
     const check = currentCheck ? "passed" : v.state.lastCheckFailed ? "failed" : "missing";
     const result = {digest:v.change.digest,check,visualDigest:""};
-    if (!currentCheck) return {...result,phase:"check",issue:gateReason(v.change,v.state,false) || "Current standard check receipt absent or stale."};
+    if (!currentCheck) return {...result,phase:"check",issue:verifyCheck ? "Current standard check receipt absent or stale (or check running)." : gateReason(v.change,v.state,false)};
     const waiting = await childStatus(id);
     if (waiting) return {...result,phase:waiting.startsWith("A child dispatch")?"blocked":"waiting",issue:waiting};
     if (managedReview) {
