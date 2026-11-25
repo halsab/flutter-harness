@@ -4,7 +4,49 @@
   "default_agent": "build",
   "agents": {
     "build": {
-      "model": "openai/gpt-6-luna#medium"
+      "model": "openai/gpt-6-luna#medium",
+      "permissions": [
+        {
+          "action": "shell",
+          "resource": "git worktree *",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "brainstorming",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "writing-plans",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "executing-plans",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "subagent-driven-development",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "using-git-worktrees",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "finishing-a-development-branch",
+          "effect": "deny"
+        },
+        {
+          "action": "skill",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     },
     "plan": {
       "model": "openai/gpt-6-luna#high"
@@ -347,11 +389,6 @@
     },
     {
       "action": "shell",
-      "resource": "git worktree *",
-      "effect": "deny"
-    },
-    {
-      "action": "shell",
       "resource": "git push *",
       "effect": "deny"
     },
@@ -401,36 +438,6 @@
       "effect": "ask"
     },
     {
-      "action": "skill",
-      "resource": "brainstorming",
-      "effect": "deny"
-    },
-    {
-      "action": "skill",
-      "resource": "writing-plans",
-      "effect": "deny"
-    },
-    {
-      "action": "skill",
-      "resource": "executing-plans",
-      "effect": "deny"
-    },
-    {
-      "action": "skill",
-      "resource": "subagent-driven-development",
-      "effect": "deny"
-    },
-    {
-      "action": "skill",
-      "resource": "using-git-worktrees",
-      "effect": "deny"
-    },
-    {
-      "action": "skill",
-      "resource": "finishing-a-development-branch",
-      "effect": "deny"
-    },
-    {
       "action": "shell",
       "resource": "gh pr create *",
       "effect": "deny"
@@ -449,11 +456,6 @@
       "action": "shell",
       "resource": "python3 .flutter-harness/bin/harness.py deliver",
       "effect": "ask"
-    },
-    {
-      "action": "skill",
-      "resource": "*",
-      "effect": "deny"
     }
   ]
 }
