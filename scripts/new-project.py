@@ -33,7 +33,7 @@ def main():
     (root/"lib/main.dart").write_bytes((template/"lib/main.dart.template").read_bytes())
     test = root/"test"
     test.mkdir(exist_ok=True)
-    (test/"material_test.dart").write_bytes((template/"smoke_test.dart.template").read_bytes())
+    (test/"material_test.dart").write_text((template/"smoke_test.dart.template").read_text().replace("package:harness_product_smoke/", f"package:{a.name}/"))
     run("flutter","pub","add","material_ui:^1.1.0",cwd=root)
     product = root/".flutter-harness/product.json"
     data = json.loads(product.read_text())

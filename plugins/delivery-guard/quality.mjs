@@ -136,7 +136,9 @@ export async function candidate(root, base, request, failedNames = []) {
 
 // All evidence comes from tool hooks and the child session, not a build-agent
 // assertion or a marker file. Ordinary tasks do not launch another model.
-export async function registerQualityGate(ctx, root, base, taskKey) {
+export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual = async () => {
+  await exec("python3", [join(root, ".flutter-harness/bin/harness.py"), "visual-evidence"], {cwd:root, timeout:60000});
+}) {
   const key = (id) => "quality/" + id;
   const pending = (id, call) => "quality-call/" + id + "/" + call;
   async function readState(id) { return (await ctx.storage.get(key(id))) || {}; }
@@ -145,6 +147,10 @@ export async function registerQualityGate(ctx, root, base, taskKey) {
     if (!task?.active) return null;
     const state = await readState(id);
     const change = await candidate(root, base, task.request || "", state.failedNames || []);
+    try {
+      const manifest = JSON.parse(await readFile(join(root, ".flutter-harness/work/delivery.json"),"utf8"));
+      if (manifest.review_required === true && !change.reasons.length) change.reasons.push("semantic or owner-requested independent review");
+    } catch (err) { if (err.code !== "ENOENT") throw err; }
     return { task, state, change };
   }
   async function approved(id, state, change) {
@@ -161,9 +167,13 @@ export async function registerQualityGate(ctx, root, base, taskKey) {
     const check = checked ? "passed" : v.state.lastCheckFailed ? "failed" : "missing";
     const approvedReview = checked && v.change.reasons.length > 0 &&
       await approved(id, v.state, v.change);
-    const why = gateReason(v.change, v.state, approvedReview);
+    let why = gateReason(v.change, v.state, approvedReview);
+    if (checked && v.change.reasons.includes(visualRisk)) {
+      try { await verifyVisual(); }
+      catch { why = "Current candidate needs actual light/dark runtime capture evidence (CLI launch/capture)."; }
+    }
     if (!why) return { issue: "", phase: "work", digest: v.change.digest, check };
-    const phase = !checked ? "check" : "review";
+    const phase = !checked ? "check" : why.startsWith("Current candidate needs") ? "work" : "review";
     const prefix = v.change.reasons.length ? "Risk gate: " + v.change.reasons.join("; ") + ". " : "";
     const review = v.change.reasons.length ?
       " Reviewer route: Luna #" + v.change.effort + " (" + v.change.size.files +

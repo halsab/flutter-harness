@@ -119,7 +119,7 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
     permission:{hook:async(n,f)=>hooks[n]=f},
     session:{get:async()=>child,context:async()=>[{type:"assistant",content:[{type:"text",text:"VERDICT: PASS"}]}]},
   };
-  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{});
   const publish=async()=>{const e={sessionID:"main",action:"shell",resources:["python3 .flutter-harness/bin/harness.py deliver"],effect:"ask"};await hooks.evaluate(e);return e;};
   assert.equal((await publish()).effect,"deny");
   await mkdir(join(root,".flutter-harness"),{recursive:true});
@@ -177,7 +177,7 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
       context:async()=>[{type:"assistant",content:[{type:"text",text:verdict}]}],
     },
   };
-  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{});
   const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});

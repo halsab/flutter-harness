@@ -8,22 +8,6 @@ LEVEL="${2:-standard}"
 PROFILE="${3:-}"
 [[ -n "$PROJECT" && -f "$PROJECT/pubspec.yaml" ]] || usage
 [[ "$LEVEL" == "quick" || "$LEVEL" == "standard" || "$LEVEL" == "full" ]] || usage
-# Resolve the installed profile in code, not in an agent prompt. Keep the
-# historical mobile default for uninstalled projects and explicit overrides.
-if [[ -z "$PROFILE" ]]; then
-  if [[ -e "$PROJECT/.flutter-harness/config.json" ]]; then
-    PROFILE="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["profile"])' "$PROJECT/.flutter-harness/config.json")" || {
-      echo "BLOCKED: cannot read installed Harness profile" >&2
-      exit 3
-    }
-    [[ "$PROFILE" == "mobile" || "$PROFILE" == "mobile-web" ]] || {
-      echo "BLOCKED: invalid installed Harness profile: $PROFILE" >&2
-      exit 3
-    }
-  else
-    PROFILE=mobile
-  fi
-fi
 [[ "$PROFILE" == "mobile" || "$PROFILE" == "mobile-web" ]] || usage
 command -v flutter >/dev/null 2>&1 || { echo "BLOCKED: flutter missing from PATH" >&2; exit 3; }
 command -v dart >/dev/null 2>&1 || { echo "BLOCKED: dart missing from PATH" >&2; exit 3; }

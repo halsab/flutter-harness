@@ -36,6 +36,7 @@ def digest(data):
 
 
 def safe(root, name):
+    require(not Path(name).is_absolute() and ".." not in Path(name).parts, f"Unsafe managed path: {name}")
     path = root / name
     require(not any(p.is_symlink() for p in (path, *path.parents) if p != root and root in p.parents),
             f"Symlink in managed path: {name}")
@@ -73,6 +74,7 @@ def install(root, profile, base, adopt=False):
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     require(not previous or previous.get("schema") == 2, "Unsupported managed manifest")
     old = previous.get("files", {})
+    require(isinstance(old, dict) and all(name in (".flutter-harness/config.json", ".flutter-harness/PRODUCT.md", "opencode.jsonc") or name.startswith((".flutter-harness/bin/", ".flutter-harness/templates/product/", ".opencode/plugins/delivery-guard/")) for name in old), "Invalid managed manifest paths")
     require(not adopt or not previous, "--adopt is for the one-time pre-schema-2 migration")
     if adopt:
         require(not git(root, "status", "--porcelain"), "Adoption requires a clean Git checkout")
@@ -85,6 +87,7 @@ def install(root, profile, base, adopt=False):
     require(agents.count(START) == agents.count(END) and agents.count(START) <= 1,
             "Ambiguous managed AGENTS block")
     match = re.search(re.escape(START) + r"[\s\S]*?" + re.escape(END), agents)
+    require(not previous or match, "Managed AGENTS block is missing")
     if match and previous:
         require(digest(match.group().encode()) == previous["agents_block"],
                 "Local edits inside managed AGENTS block")
@@ -93,6 +96,7 @@ def install(root, profile, base, adopt=False):
     new_agents = (agents[:match.start()] + block + agents[match.end():] if match
                   else agents.rstrip() + ("\n\n" if agents.strip() else "") + block + "\n")
     require(not (root / "opencode.json").exists(), "Existing opencode.json needs explicit manual reconciliation")
+    safe(root, ".gitignore")
     # Preflight every write/removal before touching any managed file.
     for name in set(old) | set(new) | (set(RETIRED) if adopt else set()):
         path = safe(root, name)
@@ -120,7 +124,7 @@ def install(root, profile, base, adopt=False):
     if not product_path.exists():
         product_path.write_bytes((SOURCE / "templates/product/product.json").read_bytes())
     agents_path.write_text(new_agents, encoding="utf-8")
-    ignore = root / ".gitignore"
+    ignore = safe(root, ".gitignore")
     lines = ignore.read_text().splitlines() if ignore.exists() else []
     for entry in IGNORES:
         if entry not in lines:

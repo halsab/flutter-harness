@@ -26,17 +26,17 @@ def require(ok, message):
         raise Blocked(message)
 
 
-def run(root, *args, capture=False, timeout=600, log=None):
+def run(root, *args, capture=False, timeout=600, log=None, env=None):
     if log:
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("wb") as stream:
             result = subprocess.run(args, cwd=root, stdout=stream,
-                                    stderr=subprocess.STDOUT, timeout=timeout)
+                                    stderr=subprocess.STDOUT, timeout=timeout, env=env)
         if result.returncode:
             raise Blocked(f"{args[0]} exit={result.returncode}; log={log}")
         return ""
     result = subprocess.run(args, cwd=root, capture_output=capture,
-                            timeout=timeout)
+                            timeout=timeout, env=env)
     if result.returncode:
         detail = (result.stderr or b"").decode(errors="replace")[-1000:] if capture else ""
         raise Blocked(f"{args[0]} exit={result.returncode}: {detail}")
@@ -162,6 +162,13 @@ def doctor(root, c, operation):
               "e2e": ("flutter",)}[operation]
     tools = {name: shutil.which(name) for name in needed}
     missing = [name for name, location in tools.items() if not location]
+    devices = None
+    if operation in ("android", "ios", "web") and not missing:
+        try:
+            devices = json.loads(run(root, "flutter", "devices", "--machine",
+                                     capture=True, timeout=60))
+        except (Blocked, ValueError):
+            missing.append("Flutter device discovery")
     if operation == "deliver" and not missing:
         try:
             run(root, "gh", "auth", "status", "--hostname", "github.com",
@@ -169,13 +176,14 @@ def doctor(root, c, operation):
         except Blocked:
             missing.append("github authentication")
     output(status="BLOCKED" if missing else "PASS", operation=operation,
-           tools=tools, missing=missing, profile=c["profile"])
+           tools=tools, missing=missing, profile=c["profile"], devices=devices)
     require(not missing, "Missing required prerequisites")
 
 
 def check(root, c):
     receipt = work(root) / "check.json"
     receipt.unlink(missing_ok=True)
+    require((root / ".flutter-harness/product.json").is_file(), "Missing product policy configuration")
     run(root, "flutter", "pub", "get", log=work(root) / "pub-get.log")
     run(root, "dart", "format", "lib", "test", log=work(root) / "format.log")
     before = fingerprint(root)
@@ -240,6 +248,12 @@ def deliver(root, c):
     require(receipt.get("status") == "PASS" and receipt.get("digest") == digest,
             "Missing/stale standard check receipt; run check")
     manifest = read_json(work(root) / "delivery.json")
+    required_e2e = manifest.get("required_e2e", [])
+    require(isinstance(required_e2e, list) and all(p in ("android", "ios", "web") for p in required_e2e), "Invalid required_e2e")
+    for platform in required_e2e:
+        e = read_json(work(root) / ("e2e-" + platform + ".json"))
+        require(e.get("status") == "PASS" and e.get("digest") == digest and e.get("platform") == platform,
+                f"Missing/stale required {platform} E2E")
     for key in ("message", "title", "body"):
         require(isinstance(manifest.get(key), str) and manifest[key].strip(),
                 f"Missing delivery {key}")
@@ -290,14 +304,17 @@ def deliver(root, c):
     else:
         run(root, "gh", "pr", "create", "--repo", repo, "--base", base,
             "--head", name, "--title", manifest["title"], "--body-file", str(body))
-    verify(root, c)
+    pr = verify(root, c)
+    atomic_json(work(root) / "delivery-result.json", {"status": "PASS", "head": text(git(root, "rev-parse", "HEAD")), "pr": pr["url"], "digest": digest, "checked_at": receipt.get("checked_at"), "delivered_at": int(time.time())})
 
 
 def scaffold(root, name, layers):
     require(re.fullmatch(r"[a-z][a-z0-9_]*", name), "Use snake_case feature name")
     require(layers, "Select needed layers")
     for layer in layers:
-        (root / "lib/features" / name / layer).mkdir(parents=True, exist_ok=True)
+        target = root / "lib/features" / name / layer
+        require(not any(p.is_symlink() for p in (target, *target.parents) if p != root and root in p.parents), "Symlink in scaffold path")
+        target.mkdir(parents=True, exist_ok=True)
     output(status="PASS", feature=name, layers=layers)
 
 
@@ -322,6 +339,10 @@ def launch(root, c, platform, device):
         device = match.group(1)
     else:
         require(device and not device.startswith("-"), "Explicit emulator/simulator ID required")
+        if platform == "android":
+            require(text(run(root,"adb","-s",device,"shell","getprop","ro.kernel.qemu",capture=True)) == "1", "Use an Android emulator, not a physical device")
+        else:
+            run(root,"xcrun","simctl","getenv",device,"HOME",capture=True)
         run(root, "flutter", "run", "--no-resident", "-d", device,
             log=work(root) / "launch.log", timeout=900)
     require(fingerprint(root) == digest, "Runtime source changed during launch")
@@ -366,23 +387,51 @@ def capture(root, platform, label, theme, viewport):
     output(status="CAPTURED", path=str(image), digest=digest)
 
 
+def visual_evidence(root):
+    digest = fingerprint(root)
+    folder = root / ".flutter-harness/previews" / digest
+    valid = []
+    for metadata in sorted(folder.glob("*.json")):
+        try:
+            item = read_json(metadata)
+            image = metadata.with_suffix(".png")
+            data = image.read_bytes()
+            if (item.get("digest") == digest and item.get("platform") in ("android","ios","web")
+                and item.get("theme") in ("light","dark")
+                and data.startswith(PNG) and hashlib.sha256(data).hexdigest() == item.get("sha256")):
+                valid.append(item)
+        except (OSError, ValueError, Blocked):
+            continue
+    groups = {(x["platform"], x.get("target"), x.get("viewport")) for x in valid}
+    require(any({x["theme"] for x in valid if (x["platform"], x.get("target"), x.get("viewport")) == key}
+                == {"light","dark"} for key in groups),
+            "Current candidate needs light/dark captures from one representative target")
+    output(status="PASS", digest=digest, captures=valid)
+
+
 def e2e(root, platform, scenario, device):
     path = Path(scenario)
     require(not path.is_absolute() and ".." not in path.parts and
             (root / path).is_file() and not (root / path).is_symlink(),
             "Expected a project-local scenario file")
     digest = fingerprint(root)
+    runtime = read_json(work(root) / "runtime.json")
+    require(runtime.get("digest") == digest and runtime.get("platform") == platform,
+            "Launch the current candidate before E2E")
+    environment = dict(os.environ)
     if platform == "web":
+        environment["HARNESS_WEB_URL"] = runtime["device"]
         require(path.parts[0] in ("e2e", "playwright", "tests"), "Use a committed Playwright scenario")
         args = ("npx", "--no-install", "playwright", "test", scenario)
     else:
         require(device and not device.startswith("-") and path.parts[0] == "maestro",
                 "Maestro scenario and explicit device required")
+        require(device == runtime["device"], "E2E device differs from launched target")
         args = ("bash", str(HERE / "maestro.sh"), "--device", device, "test", scenario)
     log = work(root) / ("e2e-" + platform + ".log")
     receipt = log.with_suffix(".json")
     receipt.unlink(missing_ok=True)
-    run(root, *args, log=log, timeout=600)
+    run(root, *args, log=log, timeout=600, env=environment)
     require(fingerprint(root) == digest, "E2E candidate changed")
     atomic_json(receipt, {"status": "PASS", "digest": digest, "scenario": scenario,
                           "platform": platform, "device": device, "log": str(log)})
@@ -408,7 +457,7 @@ def main():
     p.add_argument("operation", choices=("check","deliver","android","ios","web","e2e"))
     p = sub.add_parser("begin")
     p.add_argument("branch")
-    for cmd in ("check","deliver","verify","status","fingerprint","stop-preview","adopt"):
+    for cmd in ("check","deliver","verify","status","fingerprint","stop-preview","adopt","visual-evidence"):
         sub.add_parser(cmd)
     p = sub.add_parser("scaffold")
     p.add_argument("name")
@@ -459,6 +508,8 @@ def main():
             launch(root, c, a.platform, a.device)
         elif a.command == "capture":
             capture(root, a.platform, a.label, a.theme, a.viewport)
+        elif a.command == "visual-evidence":
+            visual_evidence(root)
         elif a.command == "stop-preview":
             run(root, sys.executable, str(HERE / "web-preview.py"), "stop")
         elif a.command == "e2e":
