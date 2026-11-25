@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+sys.dont_write_bytecode=True
 import harness as h
 
 LIMIT=3
@@ -202,7 +203,7 @@ def next_pr(root,c):
         h.output(status="COMPLETE")
         return None
     item=remaining[0]
-    h.output(status="READY_FOR_OWNER",**item)
+    h.output(status="READY_FOR_OWNER",**item,merge_command=["gh","pr","merge",str(item["number"]),"--squash","--match-head-commit",item["head"]])
     return item
 
 def clean(root,c,name):

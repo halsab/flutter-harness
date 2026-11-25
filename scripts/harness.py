@@ -504,6 +504,8 @@ def deliver(root, c):
     """Called only after the OpenCode policy gate and owner publication approval.
     The receipt is workflow evidence, not an adversarial security boundary."""
     name = branch(root, c["integration_branch"])
+    assigned=workspace_assignment(root)
+    require(not assigned or assigned["branch"]==name,"Worktree branch differs from assigned task")
     receipt = read_json(work(root) / "check.json")
     digest = fingerprint(root)
     require(current_check(root,digest),
@@ -718,6 +720,7 @@ def visual_preflight(root,c,only=None):
     unavailable = []
     for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
         try:
+            assert_runtime_access(root,platform,target)
             dimensions = probe_runtime(root,platform,target)
         except (Blocked,OSError,ValueError,subprocess.TimeoutExpired) as exc:
             unavailable.append({"platform":platform,"device":target,"reason":str(exc)[:800]})
@@ -741,9 +744,7 @@ def launch_auto(root,c,only=None,fresh=False,*,baseline=False):
     require(task.get("branch")==text(git(root,"branch","--show-current")) and task.get("revision")==c["revision"],
             "Runtime task receipt is stale; begin on the correct branch")
     if digest != task.get("baseline_digest"):
-        checked = work(root)/"check.json"
-        require(checked.is_file() and read_json(checked).get("status")=="PASS" and
-                read_json(checked).get("digest")==digest,
+        require(current_check(root,digest),
                 "Run the canonical check on the changed candidate before building runtime")
     unavailable = []
     for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
@@ -943,8 +944,7 @@ def capture_plan(root,c,refresh=()):
         require(platform!="web" or isinstance(item.get("viewport"),str) and re.fullmatch(r"\d+,\d+",item["viewport"]),
                 "Web batch scenario needs viewport")
     digest = fingerprint(root)
-    checked = read_json(work(root)/"check.json")
-    require(checked.get("status")=="PASS" and checked.get("digest")==digest,"Check exact candidate before capture-plan")
+    require(current_check(root,digest),"Check exact candidate before capture-plan")
     runtime = read_json(work(root)/"runtime.json")
     require(runtime.get("digest")==digest and runtime.get("platform")==platform,
             "Run launch auto for checked candidate before capture-plan")

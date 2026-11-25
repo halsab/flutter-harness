@@ -27,6 +27,9 @@ class Lifecycle(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name) / "app"
         self.root.mkdir()
+        slots=patch.object(h,"slot_path",side_effect=lambda platform:self.root.parent/"slots"/(platform+".json"))
+        slots.start()
+        self.addCleanup(slots.stop)
         self.remote = self.root.parent / "remote.git"
         self.git("init", "-b", "trunk")
         self.git("config", "user.name", "Harness")
