@@ -26,3 +26,5 @@ requires fresh affected checks and at most one substantive targeted independent 
 The standard gate requires current evidence even for routine changes.
 The classifier is conservative and lexical, not semantic understanding.
 Local receipt provenance is not an adversarial security boundary.
+
+Default visual runtime is one pinned target selected by CLI launch auto in iOS → Android → Web order. Additional platform builds/E2E require actual affected platform risk or release scope. Significant layout changes test representative compact, medium, expanded sizes and resize/state preservation with actual feature widget tests; use real wide runtime evidence when materially affected, not a mandatory three-platform matrix. Small changes stay scoped.

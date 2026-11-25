@@ -67,6 +67,8 @@ def install(root, profile, base, adopt=False):
     require(re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/-]*", base), "Invalid base")
     subprocess.run(["git", "check-ref-format", "--branch", base], check=True,
                    stdout=subprocess.DEVNULL)
+    require(not git(SOURCE,"status","--porcelain","--","scripts","plugins","templates"),
+            "Commit Harness source changes before installing a revision")
     revision = git(SOURCE, "rev-parse", "HEAD")
     manifest_path = safe(root, ".flutter-harness/managed.json")
     config_path = safe(root, ".flutter-harness/config.json")

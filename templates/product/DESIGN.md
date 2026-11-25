@@ -7,10 +7,10 @@ additional review round. Apply proportionately.
 
 ## 1. Choose a design direction before UI code
 
-Run `python3 .flutter-harness/bin/harness.py doctor visual` before material UI edits. It probes actual simulator screenshots and Chromium availability without compiling every platform. Choose one ready target, launch the baseline and inspect it. A probe is not proof the app launches. If launch fails, inspect its unique log and try one suitable ready alternative; do not loop builds or install tools silently. Preserve the same target, width and representative fixture for baseline/final when possible.
+After `begin`, run `python3 .flutter-harness/bin/harness.py launch auto` before material UI edits. It probes and launches one booted simulator per platform in priority iOS → Android → Web, stopping on first successful launch. Optional HARNESS_IOS_DEVICE/HARNESS_ANDROID_DEVICE select a preferred booted device within the platform. The first successful target is pinned for the task; final `launch auto` reuses it. No silent switching after baseline. Diagnose a pinned failure and preserve evidence. `doctor visual` is an optional non-building first-ready probe, not app launch evidence. Do not silently install tools, boot/reset devices or build every platform. Explicit affected-platform E2E remains available. Preserve target, width and representative fixture for baseline/final.
 
 For minor changes preserve the existing visual language and adapt the
-relevant component; no new mockups. For a substantial new screen, major
+relevant component; no new mockups, two-option design exercise or full-screen redesign. Implement the precise requested outcome and inspect only affected states. For significant layout changes apply PRODUCT.md adaptive acceptance; choose a bounded single column, list-detail, supporting pane or grid based on actual user jobs, not an arbitrary desktop layout. For a substantial new screen, major
 navigation/flow or redesign, establish the behavior contract (BEHAVIOR.md)
 first. Identify the primary job, focal content, frequent and rare actions,
 required states and the space available. Inspect the actual existing screen
