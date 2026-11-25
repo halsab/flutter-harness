@@ -16,6 +16,15 @@ test("shared product UI and explicit redesign require review even at small sizes
   assert.ok(classify(["lib/design_system/theme.dart"],"change palette").length);
   assert.ok(classify(["lib/features/tasks/screens/tasks.dart"],"редизайн UI/UX").length);
   assert.equal(classify(["lib/features/tasks/screens/tasks.dart"],"fix typo").length,0);
+  // PR #30 used natural Russian wording rather than the keyword "редизайн".
+  const screen = ["lib/features/tasks/screens/tasks.dart"];
+  assert.ok(classify(screen,"Переработай интерфейс приложения «Мои задачи», чтобы оно выглядело современно").some(r=>r.includes("material UI")));
+  assert.ok(classify(screen,"Переделай экран задач").some(r=>r.includes("material UI")));
+  assert.ok(classify(screen,"Создай новый экран истории").some(r=>r.includes("material UI")));
+  assert.ok(classify(screen,"Rework the task list interface").some(r=>r.includes("material UI")));
+  assert.equal(classify(screen,"Исправь сортировку задач").length,0);
+  assert.equal(classify(["test/widget_test.dart"],"Переработай интерфейс").length,0);
+  assert.ok(classify(["lib/app/bootstrap.dart"],"Move bootstrap").every(r=>!r.includes("material UI")));
 });
 test("review effort scales with diff size and risk, not the builder's choice", () => {
   assert.equal(reviewEffort({files:1,lines:20}),"medium");
@@ -30,37 +39,32 @@ test("review effort scales with diff size and risk, not the builder's choice", (
   assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6-luna",variant:"xhigh"},"high"),true);
   assert.equal(matchingReviewModel({providerID:"openai",id:"gpt-6.2-sol",variant:"xhigh"},"high"),false);
 });
-test("only delivery commands and standard checks match", () => {
-  for (const c of ["git push -u origin feature/a", "gh pr create --base app", "gh pr ready 1", "git status && git push"]) assert.ok(publishing(c), c);
-  for (const c of ["git diff", "gh pr view 1", "flutter test"]) assert.equal(publishing(c), false);
-  // Regression: the default mode is standard, just as in check.sh.
-  for (const c of [
-    "bash .flutter-harness/bin/check.sh .",
-    "bash .flutter-harness/bin/check.sh . standard",
-    "bash .flutter-harness/bin/check.sh . standard mobile-web",
-    "bash .flutter-harness/bin/check.sh . standard mobile",
-    "./.flutter-harness/bin/check.sh .",
-  ]) assert.ok(standardCheck(c), c);
-  for (const c of [
-    "bash .flutter-harness/bin/check.sh",
-    "bash .flutter-harness/bin/check.sh . quick",
-    "bash .flutter-harness/bin/check.sh . quick mobile-web",
-    "echo .flutter-harness/bin/check.sh . standard",
-    "bash .flutter-harness/bin/check.sh . standard && echo done",
-  ]) assert.equal(standardCheck(c), false, c);
+test("only canonical check and publication commands match", () => {
+  assert.ok(publishing("python3 .flutter-harness/bin/harness.py deliver"));
+  assert.ok(publishing("git push -u origin feature/a"));
+  assert.ok(publishing("gh pr create --base app"));
+  assert.equal(publishing("git diff"), false);
+  assert.ok(standardCheck("python3 .flutter-harness/bin/harness.py check"));
+  assert.equal(standardCheck("bash .flutter-harness/bin/check.sh ."), false);
+  assert.equal(standardCheck("python3 .flutter-harness/bin/harness.py check && echo pass"), false);
 });
 test("review requires final exact PASS, not a build-agent claim or earlier PASS", () => {
   const m = text => ({ type: "assistant", content: [{type:"text", text}] });
   assert.ok(finalVerdict([m("No material issues.\nVERDICT: PASS")]));
   assert.equal(finalVerdict([m("VERDICT: PASS"),m("VERDICT: CHANGES_REQUIRED")]), false);
   assert.equal(finalVerdict([m("PASS")]), false);
+  assert.equal(finalVerdict([m("VERDICT: PASS")],true),false);
+  assert.equal(finalVerdict([m("VISUAL: CHANGES_REQUIRED\nVERDICT: PASS")],true),false);
+  assert.ok(finalVerdict([m("Opened actual before/after images.\nVISUAL: PASS\nVERDICT: PASS")],true));
+  assert.equal(finalVerdict([m("VISUAL: PASS\nVERDICT: PASS"),m("VERDICT: PASS")],true),false);
 });
 test("risk requires same-candidate checks and review; ordinary tasks do not", () => {
   const c = {digest:"a",reasons:["storage"]};
   assert.ok(gateReason(c,{passedDigest:"b"},true));
   assert.ok(gateReason(c,{passedDigest:"a"},false));
   assert.equal(gateReason(c,{passedDigest:"a"},true),"");
-  assert.equal(gateReason({digest:"a",reasons:[]},{},false),"");
+  assert.match(gateReason({digest:"a",reasons:[]},{},false), /standard check/);
+  assert.equal(gateReason({digest:"a",reasons:[]},{passedDigest:"a"},false),"");
   assert.match(gateReason({digest:"a",reasons:[]},{lastCheckFailed:true},false),/previous standard check failed/);
 });
 async function fixture(t) {
@@ -116,11 +120,11 @@ test("mock V2 hooks deny risky push until real child PASS at required effort, th
     session:{get:async()=>child,context:async()=>[{type:"assistant",content:[{type:"text",text:"VERDICT: PASS"}]}]},
   };
   const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
-  const publish=async()=>{const e={sessionID:"main",action:"shell",resources:["git push -u origin feature/bulk"],effect:"ask"};await hooks.evaluate(e);return e;};
+  const publish=async()=>{const e={sessionID:"main",action:"shell",resources:["python3 .flutter-harness/bin/harness.py deliver"],effect:"ask"};await hooks.evaluate(e);return e;};
   assert.equal((await publish()).effect,"deny");
   await mkdir(join(root,".flutter-harness"),{recursive:true});
   await writeFile(join(root,".flutter-harness/product.json"),JSON.stringify({status:"active"}));
-  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"bash .flutter-harness/bin/check.sh ."}};
+  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   assert.equal((await publish()).effect,"deny");
@@ -155,4 +159,37 @@ test("changing a behavior contract invalidates evidence without inflating source
   const after=await candidate(root,"app","");
   assert.notEqual(after.digest,before.digest);
   assert.deepEqual(after.size,before.size);
+});
+
+test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
+  const {root,git}=await fixture(t);
+  await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
+  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// visual change\n");
+  const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
+  const hooks={};
+  let verdict="VERDICT: PASS";
+  const ctx={
+    storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
+    tool:{hook:async(n,f)=>hooks[n]=f},
+    permission:{hook:async(n,f)=>hooks[n]=f},
+    session:{
+      get:async()=>({parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}}),
+      context:async()=>[{type:"assistant",content:[{type:"text",text:verdict}]}],
+    },
+  };
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
+  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
+  await hooks["execute.before"](check);
+  await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
+  const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review"}};
+  await hooks["execute.before"](review);
+  assert.match(review.input.prompt,/VISUAL: PASS/);
+  await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
+  assert.match(await q.reason("main"),/reviewer verdict/);
+  verdict="VISUAL: PASS\nVERDICT: PASS";
+  assert.equal(await q.reason("main"),"");
+  git("add","."); git("commit","-qm","visual change");
+  assert.equal(await q.reason("main"),"");
+  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// changed again\n");
+  assert.match(await q.reason("main"),/standard check/);
 });
