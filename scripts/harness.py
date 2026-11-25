@@ -137,6 +137,7 @@ def branch(root, base):
 
 def begin(root, c, name):
     base = c["integration_branch"]
+    require(not name.startswith("-"), "Invalid branch")
     git(root, "check-ref-format", "--branch", name)
     require(name not in (base, "main", "master", "app", "develop") and
             not name.startswith("-"), "Unsafe feature branch")
@@ -198,7 +199,7 @@ def origin_repo(root):
 def pr_list(root, repo, name):
     data = json.loads(run(root, "gh", "pr", "list", "--repo", repo,
                           "--head", name, "--state", "open",
-                          "--json", "number,baseRefName,headRefName,headRepositoryOwner,isCrossRepository",
+                          "--json", "number,baseRefName,headRefName,headRepositoryOwner,isCrossRepository,isDraft",
                           capture=True, timeout=60))
     require(isinstance(data, list), "Invalid GitHub PR response")
     own = [p for p in data if p.get("headRefName") == name and
@@ -284,6 +285,8 @@ def deliver(root, c):
     if existing:
         run(root, "gh", "pr", "edit", str(existing["number"]), "--repo", repo,
             "--title", manifest["title"], "--body-file", str(body))
+        if existing.get("isDraft"):
+            run(root, "gh", "pr", "ready", str(existing["number"]), "--repo", repo)
     else:
         run(root, "gh", "pr", "create", "--repo", repo, "--base", base,
             "--head", name, "--title", manifest["title"], "--body-file", str(body))

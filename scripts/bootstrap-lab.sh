@@ -59,4 +59,4 @@ git push -u origin app
 note "SUCCESS: main and app start from the same SDK-generated starter."
 note "Lab: $DEST"
 note "Use fresh branches from main for independent harness evaluations."
-note "Next: use bash '$ROOT/scripts/install.sh' '$DEST' mobile-web when testing installation."
+note "Next: use bash '$ROOT/scripts/install.sh' '$DEST' mobile-web app when testing installation."
