@@ -31,8 +31,10 @@ The package name is not necessarily the user-visible app name; configure the dis
 
 Creates Flutter, installs Harness, checks and commits the starter. The target
 may be an empty directory or an existing empty Git repository on the requested
-integration branch. Existing Git remote is preserved. Publish the initial
-integration branch before starting OpenCode.
+integration branch. Untracked macOS `.DS_Store` metadata is ignored and never
+committed. Existing Git history and remote are preserved. Other existing
+files or pending tracked changes are reported rather than overwritten.
+Publish the initial integration branch before starting OpenCode.
 
 ## 2. Install or update Harness in an existing Flutter project
 
