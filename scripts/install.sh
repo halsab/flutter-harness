@@ -116,12 +116,12 @@ if ! grep -Fq '<!-- flutter-harness:start -->' "$TARGET/AGENTS.md"; then
 ## Flutter Harness
 Read .flutter-harness/config.json and .flutter-harness/product.json.
 In an active product, use this workflow for isolated fixes/routine features.
-Load the flutter-harness skill for pending/unknown adoption, interacting
-behavior, substantial UI/architecture work, high risk, multi-slice work
-or difficult recovery. If uncertain, load it. Read .flutter-harness/PRODUCT.md
-before adoption or meaningful UI/architecture changes; preserve the adopted
-baseline. Default feature-first MVVM, Material 3, Flutter Web. Never disable
-the product guard. Avoid reloading unchanged context.
+No skills by default. Use the specific guides below for nonroutine work.
+Read .flutter-harness/PRODUCT.md before pending/unknown adoption or meaningful
+UI/architecture changes; preserve the adopted baseline. Default feature-first
+MVVM, Material 3, Flutter Web. Never disable the product guard. Prefer CLI
+and existing scripts for reproducible operations, not agent interpretation.
+Avoid reloading unchanged context.
 
 Implement the requested outcome; ask only material product/security questions.
 Fetch the integration base (app in Lab); work on a feature branch, preserve
@@ -136,15 +136,17 @@ Inspect the task diff once before final checks; match meaningful new behavior
 to focused unit/widget assertions, reusing adequate tests. Never remove a
 failing acceptance test to get green CI. No trivial-label/styling tests or
 coverage quotas. Format touched Dart files; run one standard check:
-bash .flutter-harness/bin/check.sh . standard PROFILE
-Use the installed profile. Reuse evidence on unchanged candidates; fix the
+bash .flutter-harness/bin/check.sh . standard
+The runner resolves the installed profile. Reuse evidence on unchanged candidates; fix the
 first actual failure before rerunning. Keep main.dart focused on bootstrap.
 
 Require independent review for interacting behavior, persistent-data
 mutations, destructive changes, security, migration, concurrency, substantial
 UI/design-system/architecture changes, large diffs or explicit requests.
 Follow the plugin's risk/effort, same-candidate and bounded recovery/review
-requirements. Material UX requires actual rendered inspection per PRODUCT.md.
+requirements. For persistence, interacting controls, required E2E or review
+edge cases, consult the focused flutter-harness skill if additional guidance
+is needed. Material UX requires actual rendered inspection per PRODUCT.md.
 Device/browser E2E only for relevant platform/critical risk or explicit request;
 use known preconditions and scripted postconditions. Hidden filtered data
 is not lost data. Optional unrun E2E is NOT RUN, not a Draft blocker.
