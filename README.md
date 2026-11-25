@@ -134,3 +134,9 @@ MIT License.
 ### Delivery recovery and diagnostics
 
 `deliver` is the sole owner-approved publishing command. It reconciles an already published matching PR without another commit, push or PR edit, and writes `delivery-result.json` before reporting PASS. `completion` checks candidate-bound local evidence without a network call; `verify` additionally checks the live PR. If interrupted, retry `deliver` on the unchanged candidate; do not repeat checks. A push with no matching PR may be repeated idempotently. `diagnostics` exports only structured counters (including provider retries and synthetic continuations), lifecycle events and selected receipts from the recorded sessions into `.flutter-harness/work/diagnostics.json`; no raw session messages or credentials are persisted by this command. The idle hook records recovery/completion and session IDs, not a privileged publication action.
+
+### Material UI acceptance
+
+For material visual changes, run `python3 .flutter-harness/bin/harness.py doctor visual` before implementation. Select one working target; a screenshot probe is not a successful app launch. Declare `.flutter-harness/work/visual-plan.json` (platform, fixture, baseline, scenarios with label/kind and Web viewport) per DESIGN.md. Capture each state in both themes using the CLI, optionally with `--scenario` and `--settle`. The quality gate validates exact current evidence before dispatch and binds the independent verdict to image/plan digests as well as source. Two substantive reviews; at most one additional technical recovery. No duplicate unchanged review, no forced PASS. Material component selection and visible selected state are always project defaults.
+
+Baseline evidence is a verified prior-candidate CLI capture on the comparable target/size, or an explicitly documented blocker. Diagnostics includes each retained standard check TSV and unique native launch/scenario log references.

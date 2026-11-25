@@ -131,22 +131,60 @@ class Lifecycle(unittest.TestCase):
             with self.assertRaisesRegex(h.Blocked, "Uncommitted"):
                 h.completion(self.root,self.c)
 
-    def test_visual_requires_both_current_artifacts(self):
+    def visual_fixture(self):
         digest = h.fingerprint(self.root)
         folder = self.root/".flutter-harness/previews"/digest
         folder.mkdir(parents=True)
-        for theme in ("light","dark"):
-            p = folder/(theme+".png")
-            data = h.PNG+b"fixture content"
+        plan = {"platform":"android","fixture":"mixed short/long realistic records","baseline":{"unavailable":"new screen"},
+                "scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction"}]}
+        h.atomic_json(h.work(self.root)/"visual-plan.json", plan)
+        h.atomic_json(h.work(self.root)/"visual-preflight.json", {"status":"PASS","branch":"feature/test","ready":[{"platform":"android","device":"emulator"}]})
+        def write(label, theme, suffix):
+            p = folder/(label+"-android-"+theme+".png")
+            data = h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"+suffix
             p.write_bytes(data)
-            h.atomic_json(p.with_suffix(".json"),{"digest":digest,"platform":"android","target":"emulator","theme":theme,"sha256":hashlib.sha256(data).hexdigest()})
-        h.visual_evidence(self.root)
-        (folder/"dark.png").write_bytes(b"changed")
+            h.atomic_json(p.with_suffix(".json"),{"digest":digest,"label":label,"platform":"android","target":"emulator",
+                "theme":theme,"size":[390,844],"viewport":None,"sha256":hashlib.sha256(data).hexdigest()})
+        return folder, write
+
+    def test_visual_requires_current_complete_distinct_pairs(self):
+        folder, write = self.visual_fixture()
+        for theme in ("light","dark"):
+            write("final", theme, theme.encode())
+        with self.assertRaisesRegex(h.Blocked,"Missing capture receipt: menu"):
+            h.visual_evidence(self.root, True)
+        write("menu","light",b"same")
+        write("menu","dark",b"same")
+        with self.assertRaisesRegex(h.Blocked,"distinct"):
+            h.visual_evidence(self.root, True)
+        write("menu","dark",b"dark")
+        first=h.visual_evidence(self.root, True)["evidence_digest"]
+        preflight = h.work(self.root)/"visual-preflight.json"
+        saved = preflight.read_bytes()
+        preflight.unlink()
+        with self.assertRaisesRegex(h.Blocked,"doctor visual"):
+            h.visual_evidence(self.root, True)
+        preflight.write_bytes(saved)
+        write("menu","dark",b"new dark")
+        self.assertNotEqual(first,h.visual_evidence(self.root, True)["evidence_digest"])
+        (folder/"menu-android-dark.png").write_bytes(b"changed")
         with self.assertRaises(h.Blocked):
-            h.visual_evidence(self.root)
+            h.visual_evidence(self.root, True)
         self.write("lib/main.dart","another candidate")
         with self.assertRaises(h.Blocked):
-            h.visual_evidence(self.root)
+            h.visual_evidence(self.root, True)
+
+    def test_runtime_lock_refuses_parallel_theme_changes(self):
+        with h.target_lock("ios","test-device"):
+            with self.assertRaisesRegex(h.Blocked,"busy"):
+                with h.target_lock("ios","test-device"):
+                    self.fail("concurrent capture")
+
+    def test_web_launch_checks_chromium_before_build(self):
+        with patch.object(h,"probe_runtime",side_effect=h.Blocked("no Chromium")), patch.object(h,"run",wraps=h.run) as runner:
+            with self.assertRaisesRegex(h.Blocked,"no Chromium"):
+                h.launch(self.root,self.c,"web",None)
+            self.assertFalse(any("web-preview.py" in str(call) for call in runner.call_args_list))
 
 
 class InstallerTest(unittest.TestCase):

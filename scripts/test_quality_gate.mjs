@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { registerResourceGuard } from "../plugins/delivery-guard/resources.mjs";
 import { candidate, classify, publishing, standardCheck, finalVerdict, gateReason, registerQualityGate, reviewEffort, matchingReviewModel } from "../plugins/delivery-guard/quality.mjs";
 
 test("risk detection follows actual repository changes, not routine UI wording", () => {
@@ -167,7 +168,7 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// visual change\n");
   const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
   const hooks={};
-  let verdict="VERDICT: PASS";
+  let verdict="VERDICT: PASS", visualReady=false, visualDigest="one";
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     tool:{hook:async(n,f)=>hooks[n]=f},
@@ -177,19 +178,62 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
       context:async()=>[{type:"assistant",content:[{type:"text",text:verdict}]}],
     },
   };
-  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{});
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{
+    if(!visualReady)throw Error("missing interaction");
+    return {evidence_digest:visualDigest,captures:[{path:"final.png"}]};
+  });
   const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
   const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review"}};
+  await assert.rejects(hooks["execute.before"](review),/missing interaction/);
+  assert.match(await q.reason("main"),/runtime evidence/);
+  visualReady=true;
   await hooks["execute.before"](review);
   assert.match(review.input.prompt,/VISUAL: PASS/);
   await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
   assert.match(await q.reason("main"),/reviewer verdict/);
   verdict="VISUAL: PASS\nVERDICT: PASS";
   assert.equal(await q.reason("main"),"");
+  visualDigest="two";
+  assert.match(await q.reason("main"),/reviewer verdict/);
+  visualDigest="one";
   git("add","."); git("commit","-qm","visual change");
   assert.equal(await q.reason("main"),"");
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// changed again\n");
   assert.match(await q.reason("main"),/standard check/);
+});
+
+test("combined production hooks reserve no reviewer before evidence and bind actual approval",async t=>{
+  const {root}=await fixture(t);
+  const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
+  const hooks={}, children=new Map([["main",{}]]);
+  let ready=false, visualDigest="one", quality;
+  const ctx={
+    storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
+    tool:{hook:async(n,f)=>(hooks[n]??=[]).push(f)},
+    permission:{hook:async(n,f)=>(hooks[n]??=[]).push(f)},
+    session:{get:async({sessionID})=>children.get(sessionID),context:async()=>[{type:"assistant",content:[{type:"text",text:"VISUAL: PASS\nVERDICT: PASS"}]}]},
+  };
+  const resources=await registerResourceGuard(ctx,id=>"task/"+id,id=>quality.inputs(id),(e,i)=>quality.prepareReview(e,i));
+  quality=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{
+    if(!ready)throw Error("missing menu");
+    return {evidence_digest:visualDigest,captures:[{path:"menu.png"}]};
+  },resources.status,true,resources.reviewAvailability);
+  const emit=async(n,e)=>{for(const f of hooks[n]) await f(e);};
+  const review={tool:"subagent",sessionID:"main",id:"r",input:{agent:"reviewer",prompt:"Review"}};
+  await assert.rejects(emit("execute.before",review),/standard check/);
+  const check={tool:"shell",sessionID:"main",id:"c",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
+  await emit("execute.before",check);
+  await emit("execute.after",{...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
+  await assert.rejects(emit("execute.before",review),/missing menu/);
+  assert.equal(await resources.status("main"),"");
+  assert.deepEqual(await resources.sessions("main"),["main"]);
+  ready=true; await emit("execute.before",review);
+  assert.match(review.input.prompt,/menu.png/);
+  children.set("child",{parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}});
+  await emit("execute.after",{...review,status:"completed",result:{metadata:{sessionID:"child"}}});
+  assert.equal(await quality.reason("main"),"");
+  visualDigest="two";
+  assert.match(await quality.reason("main"),/reviewer verdict/);
 });

@@ -7,7 +7,9 @@ async function fixture() {
   const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     session:{get:async({sessionID})=>sessions.get(sessionID) || {}},
     tool:{hook:async(n,f)=>{hooks[n]=f;}}};
-  const guard=await registerResourceGuard(ctx,id=>"task/"+id);
+  let inputKey=0, ready=true;
+  ctx.session.context=async({sessionID})=>[{type:"assistant",content:[{type:"text",text:"VERDICT: "+(sessions.get(sessionID).verdict || "CHANGES_REQUIRED")}]}];
+  const guard=await registerResourceGuard(ctx,id=>"task/"+id,async()=>{if(!ready)throw Error("missing evidence");return {key:String(inputKey)};},async()=>{});
   let i=0;
   const call=async(agent,sessionID="main",model)=>{
     const e={tool:"subagent",sessionID,id:"call"+(++i),input:{agent,model}};
@@ -17,7 +19,7 @@ async function fixture() {
     sessions.set(childID,{parentID:"main",outcome});
     await hooks["execute.after"]({...e,status:"completed",result:{metadata:{sessionID:childID}}});
   };
-  return {call,finish,guard,sessions};
+  return {call,finish,guard,sessions,advance:()=>inputKey++,setReady:v=>ready=v};
 }
 test("one advisor attempt is reserved even across concurrent requests", async()=>{
   const {call,guard}=await fixture();
@@ -29,9 +31,11 @@ test("one advisor attempt is reserved even across concurrent requests", async()=
   await call("advisor");
 });
 test("two reviewer attempts; actual workers bounded and tracked",async()=>{
-  const {call,finish,guard,sessions}=await fixture();
+  const {call,finish,guard,sessions,advance}=await fixture();
   await finish(await call("reviewer"),"r1");
+  advance();
   await finish(await call("reviewer"),"r2");
+  advance();
   await assert.rejects(call("reviewer"),/budget exhausted/);
   const a=await call("worker"),b=await call("worker");
   await assert.rejects(call("worker"),/two active workers/);
@@ -48,4 +52,16 @@ test("no nested advisor or explicit Sol implementation in tracked task",async()=
   await assert.rejects(call("advisor","nested"),/task parent/);
   await assert.rejects(call("worker","main","openai/gpt-6.2-sol#high"),/reserved/);
   await call("worker","main","openai/gpt-6-luna#low");
+});
+
+test("missing evidence spends no review; changed evidence after BLOCKED allows bounded recovery",async()=>{
+  const {call,finish,guard,sessions,advance,setReady}=await fixture();
+  setReady(false); await assert.rejects(call("reviewer"),/missing evidence/);
+  setReady(true); await finish(await call("reviewer"),"r1");
+  sessions.get("r1").verdict="BLOCKED";
+  await assert.rejects(call("reviewer"),/unchanged/);
+  advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r3");
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3"]);
 });

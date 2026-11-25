@@ -76,3 +76,12 @@ test("review or delivery recovery reuses existing successful checks", () => {
   assert.match(recovery({attempts:0},result,q).prompt,/Reuse the successful standard evidence/);
   assert.match(recovery({attempts:0},result,{...q,phase:"work",issue:""}).prompt,/do not repeat builds/);
 });
+
+test("visual progress participates in recovery; exhausted budget stops immediately",()=>{
+  const result={current:base,reasons:["incomplete"]};
+  const q={phase:"visual",issue:"missing",digest:"a",check:"passed",visualDigest:"one"};
+  const first=recovery({attempts:0},result,q);
+  assert.match(first.prompt,/Do not dispatch a reviewer/);
+  assert.equal(recovery({attempts:1,lastRecovery:first.fingerprint},result,{...q,visualDigest:"two"}).stop,false);
+  assert.equal(recovery({attempts:0},result,{...q,phase:"blocked"}).stop,true);
+});
