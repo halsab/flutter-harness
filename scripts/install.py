@@ -55,6 +55,7 @@ def build(profile):
     for path in template.rglob("*"):
         if path.is_file() and path.name not in ("PRODUCT.md", "product.json"):
             result[".flutter-harness/templates/product/" + path.relative_to(template).as_posix()] = path.read_bytes()
+    result[".github/workflows/flutter.yml"] = (SOURCE / "templates/project-ci.yml").read_bytes()
     result["opencode.jsonc"] = (SOURCE / ("templates/opencode-" + profile + ".jsonc")).read_bytes()
     return result
 
@@ -74,7 +75,7 @@ def install(root, profile, base, adopt=False):
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     require(not previous or previous.get("schema") == 2, "Unsupported managed manifest")
     old = previous.get("files", {})
-    require(isinstance(old, dict) and all(name in (".flutter-harness/config.json", ".flutter-harness/PRODUCT.md", "opencode.jsonc") or name.startswith((".flutter-harness/bin/", ".flutter-harness/templates/product/", ".opencode/plugins/delivery-guard/")) for name in old), "Invalid managed manifest paths")
+    require(isinstance(old, dict) and all(name in (".flutter-harness/config.json", ".flutter-harness/PRODUCT.md", "opencode.jsonc", ".github/workflows/flutter.yml") or name.startswith((".flutter-harness/bin/", ".flutter-harness/templates/product/", ".opencode/plugins/delivery-guard/")) for name in old), "Invalid managed manifest paths")
     require(not adopt or not previous, "--adopt is for the one-time pre-schema-2 migration")
     if adopt:
         require(not git(root, "status", "--porcelain"), "Adoption requires a clean Git checkout")

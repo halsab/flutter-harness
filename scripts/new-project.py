@@ -45,6 +45,8 @@ def main():
         data["status"] = "pending"
         product.write_text(json.dumps(data,indent=2)+"\n")
         raise
+    run("git","add","-A",cwd=root)
+    run("git","commit","-m","chore: initialize Flutter product and Harness",cwd=root)
     print("PASS fresh product; configure Git origin before first task")
 if __name__ == "__main__":
     main()

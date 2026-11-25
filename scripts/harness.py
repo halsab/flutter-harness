@@ -457,7 +457,7 @@ def main():
     p.add_argument("operation", choices=("check","deliver","android","ios","web","e2e"))
     p = sub.add_parser("begin")
     p.add_argument("branch")
-    for cmd in ("check","deliver","verify","status","fingerprint","stop-preview","adopt","visual-evidence"):
+    for cmd in ("check","ci","deliver","verify","status","fingerprint","stop-preview","adopt","visual-evidence"):
         sub.add_parser(cmd)
     p = sub.add_parser("scaffold")
     p.add_argument("name")
@@ -475,7 +475,7 @@ def main():
     p.add_argument("scenario")
     p.add_argument("--device")
     p = sub.add_parser("usage")
-    p.add_argument("sessions", nargs="+")
+    p.add_argument("sessions", nargs="*")
     a = parser.parse_args()
     root = a.project.resolve()
     try:
@@ -490,6 +490,12 @@ def main():
             begin(root, c, a.branch)
         elif a.command == "check":
             check(root, c)
+        elif a.command == "ci":
+            run(root, sys.executable, str(HERE / "validate-opencode.py"), "opencode.jsonc", c["profile"])
+            require((root / ".flutter-harness/product.json").is_file(), "Missing product policy configuration")
+            run(root, "flutter", "pub", "get", log=work(root)/"pub-get.log")
+            run(root, "bash", str(HERE/"check.sh"), ".", "standard", c["profile"])
+            require(not git(root,"diff","--name-only","HEAD","--","pubspec.lock"), "Dependency lock changed in CI")
         elif a.command == "deliver":
             deliver(root, c)
         elif a.command == "verify":
@@ -515,7 +521,9 @@ def main():
         elif a.command == "e2e":
             e2e(root, a.platform, a.scenario, a.device)
         elif a.command == "usage":
-            usage(root, a.sessions)
+            sessions = a.sessions or read_json(work(root)/"sessions.json")["sessions"]
+            require(sessions, "No recorded sessions")
+            usage(root, sessions)
         return 0
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
         print(f"BLOCKED: {exc}", file=sys.stderr)

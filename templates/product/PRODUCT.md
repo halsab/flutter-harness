@@ -77,9 +77,8 @@ scroll physics, accessibility) and adapt layout to width and input method.
 Use stock Material controls and interactions first; custom visual direction
 builds on Material and the same design system (ui_profile: custom, when
 explicitly requested). No optional second component kit by default.
-Existing adaptive/minimal profile values are legacy compatibility only; do
-not select them for new projects. Convert existing projects in a separate
-reviewed migration rather than changing their setting behind the user's back.
+Only universal and explicitly requested custom Material profiles are valid.
+Older product revisions must be migrated explicitly; use Git history for rollback.
 
 One semantic light/dark theme follows system appearance on every platform.
 Material 3 generates both ColorSchemes from Ocean Blue (#2563EB), a seed,
@@ -142,48 +141,12 @@ them to the user job and baseline/target. Owner makes final aesthetic acceptance
 
 ## Adoption and checks
 
-Installer copies this policy, product.json and starter templates without
-overwriting app source or installing dependencies. Pending adoption means
-the project needs a first implementation/migration; ordinary local checks
-fail until product foundation is activated. On a fresh app or explicit
-migration, copy/adapt the starter and composition-root skeleton with `python3 .flutter-harness/bin/init-product.py .`,
-choose only needed components, move code and tests to the specified structure,
-wire AppRoot and feature ViewModels, and change product.json status to active.
-For an existing app with pending foundation, separate adoption from a broad
-redesign or unrelated feature. An old installed policy is not automatically
-updated by the installer; use a reviewed configuration sync first.
-Do not mark active before actual integration. Pending is permitted in CI only
-for initial configuration-only adoption (no application changes), not a bypass
-after activation. The checker is a lightweight convention/import/token check,
-not a complete Dart semantic or aesthetic verifier. Analyzer and actual review
-are still required. Do not disable checks or move violations into arbitrary
-allowed directories. Use a separately reviewed product-foundation update if
-a justified exception is required.
-
-## Efficient delivery
-
-For broad or genuinely interacting changes use the installed ORCHESTRATION.md
-guide. One High-effort Luna architect plans across product and implementation
-boundaries; the Medium parent executes or delegates small stable-contract slices
-to Low-effort workers. Do not require a planner or worker for simple changes.
-
-Identify meaningful failure scenarios before editing. For failed targeted
-tests, fix the specific cause rather than rerun the whole suite; after two
-unsuccessful attempts at the same substantive failure, isolate the failing
-case and, if useful, consult the Luna High architect once for focused
-diagnosis. Apply the recommendation and check the affected behavior.
-Ordinary format failures do not need escalation. Failed checks are work to
-fix, not an external blocker. If bounded recovery fails, report INCOMPLETE.
-The only standing premium-model exception is one focused Sol Medium advisor
-consultation per original task under ORCHESTRATION.md. No premium build,
-whole-project planning/review or automatic failure-based escalation. Other
-premium use requires explicit user permission.
-Use one final standard check after implementation/review corrections.
-Reuse observed successful checks and review on unchanged source/tests/spec;
-no duplicate full runs solely because the session resumed. Follow the
-resource-aware recovery policy in ORCHESTRATION.md. If
-independent review is required, it may run concurrently with deterministic
-checks on the unchanged candidate. Wait for review result without duplicate
-review requests or unrelated edits. Fix material findings, run affected
-targeted checks and one final standard run if the candidate changed, then
-one targeted re-review at most. No additional review loops or mandatory E2E.
+Fresh projects are created and verified by scripts/new-project.py. On an
+existing pending project, use the installed CLI adopt to copy missing starter
+files only; migrate application behavior explicitly, then set product.json
+active. Never downgrade an active product or disable the convention guard.
+Use the CLI check operation, which resolves dependencies, formats and runs
+conventions, analyzer and fast tests. The checker is lexical, not a complete
+semantic verifier. Required visual and semantic review remains separate.
+Existing installed files are updated by the managed installer; local edits
+block sync. See ORCHESTRATION.md only for genuinely complex work.

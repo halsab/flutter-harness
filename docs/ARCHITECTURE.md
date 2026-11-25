@@ -1,51 +1,32 @@
-# Architecture and constraints
+# Deterministic architecture (schema 2)
 
-## Repositories
-- `flutter-harness`: shared tooling, installer, skills and scripts.
-- `flutter-harness-lab`: `main` is a Flutter SDK-generated default project; `app` initially points to the **same clean starter**. The agent implements test tasks on branches from the clean baseline and may grow `app` over time.
+OpenCode is the existing model runtime, not reimplemented. The agent owns
+intent, design, source changes, acceptance selection and hard diagnosis.
+The installed Python CLI coordinates native tools, configuration, receipts,
+branch setup, scaffold, validation, runtime and delivery. Small Bash/Python
+helpers are implementations of that CLI, not competing workflows.
 
-## Product application architecture
+- Install/sync: source revision and content hashes; preflight all collisions,
+  keep unmanaged app source, explicit legacy adoption, Git rollback.
+- Fresh setup: Flutter SDK generation, Material starter, dependency setup,
+  test, commit. Existing app semantic migration is agent work.
+- Configuration: explicit profile, integration branch, managed revision.
+- Verification: standard once, exact candidate receipts, separate risk review.
+- Runtime: real platform tools, explicit target, one representative platform,
+  reusable scenarios and captures; never infer E2E from screenshots.
+- Delivery: approved canonical command, exact task files, current base,
+  candidate check and PR head verification. Resume from actual Git/PR state.
+- Recovery: bounded OpenCode idle repair prompts; no progress stops.
+- Telemetry: machine-generated check/PR receipts and session export counters.
 
-The canonical application baseline is [Product foundation](../templates/product/PRODUCT.md): feature-first MVVM, constructor injection, shared Material 3 design system on Android, iOS and Flutter Web. The checker is a convention gate, not a complete semantic verifier. Existing Lab app adopts this in a focused migration; never rewrite the SDK starter on main.
+The quality hook checks actual tool results and child review outcome; the
+CLI checks current content receipt, not a model-authored PASS string.
+The two mechanisms are workflow guardrails, not a sandbox. GitHub CI and
+branch restrictions remain independent server-side controls.
 
-## Initial scope
-- **Only new, clean Flutter SDK projects.** No adoption or migration of existing applications in v0.
-- The lab `main` branch remains the untouched Flutter SDK starter. Lab PR #5 adds the first agent-authored task manager to `app` when merged; do not ship application-specific fixtures in the reusable harness.
-- For reproducible evaluations, reset the working copy or branch from the exact clean `main` SHA, not a previously modified `app` branch.
-- The `app` branch is for observing agent-written functionality, not testing existing-project installation.
-
-## Intended workflow
-1. User describes the desired outcome. Only material product/architecture ambiguities are discussed; at most one design checkpoint. The technical plan is internal, not separately approved.
-2. Agent creates a feature branch in the current checkout and changes code in small verified steps. Ordinary branch/worktree and execution mode choices are not user-facing.
-3. Agent commits each meaningful checkpoint.
-4. Agent runs relevant static, unit/widget and runtime/E2E checks. Maestro is mobile-only by default; Playwright handles Web; report Android, iOS and Web evidence separately.
-5. Agent runs one independent, read-only final diff review (with at most one targeted recheck for a major fix), then requests push permission, pushes and creates a PR with evidence, failures and any BLOCKED checks.
-6. Only the human merges; only the human accepts new golden baselines.
-
-## Platform profiles
-- `mobile`: Android + iOS, Flutter SDK, Dart MCP and Maestro.
-- `mobile-web`: mobile plus Flutter Web, Playwright and optional Chrome DevTools.
-
-## Principles
-- Script-first, official-first, deterministic and idempotent operations.
-- Keep detailed logs as artifacts; summaries should be short and machine-readable.
-- Never claim GitHub CI checked local-only iOS tests.
-- Public-repo GitHub Actions standard hosted runners are free, but execution and artifact quotas still matter.
-- External network/publication/production secrets are outside the agent's autonomous boundary.
-- No self-hosted runner on the owner's MacBook in v0.
-- Keep GitHub branch protection for `main` and `app` where available; CLI prompts and model instructions alone are not a security boundary.
-- Plan/review subagents are read-only and coding may push only after human approval. Never attempt to bypass denied commands via other tools.
-- Tools may be visible per selected profile, while skill instructions are loaded as needed. Chrome DevTools stays disabled by default; tool schemas and long outputs consume model context.
-- Use Luna Medium for implementation and orchestration, Luna High for complex planning and diagnosis, Luna Low for bounded slices. Optional Sol Medium advisor is reserved for one compact consequential architectural decision per original task. Reviewer effort follows the existing risk gate. No automatic premium escalation.
-- Default profile does not load upstream Superpowers' repeated interactive plan approvals; optional Superpowers design sessions are deliberately separate.
-
-## Development status
-
-The bootstrap installer, Bash check runner, OpenCode V2 templates, role-specific
-model routing, and CI validation are implemented. The owner has verified a
-default Flutter project on Android emulator, iOS Simulator and Chrome, basic
-Dart/Maestro/Playwright/Chrome DevTools/Xcode MCP calls, and Sol/Luna model
-responses. These are *manual* checks, not repeatable device E2E tests.
-
-The first full task-list trial reached PR #5, with passing CI and an iOS Maestro flow. It exposed redundant approvals, repeated reviews and loops, high model/context usage and missing automatic PR handoff. The lean workflow addresses these on paper but requires a new runtime trial before claiming improvement. Additional milestones: Android E2E, reusable Playwright flows, golden baselines and an optional Dart orchestration CLI. The CI hosted on Linux does not run iOS
-simulators or prove locally authorized MCP model routing.
+No default skill, MCP or custom context summarizer. Use OpenCode's search,
+context and model routing; load only the relevant canonical product guide.
+No automatic multi-agent dispatcher for ordinary work. Explicit complex
+work may use the graph helper for dependencies and file conflicts; actual
+child completion and integrated acceptance are separate. Do not turn
+abstract graph declarations into a false delivery guarantee.

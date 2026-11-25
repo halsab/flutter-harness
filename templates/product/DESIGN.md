@@ -99,7 +99,7 @@ avoid independently invented styling per worker.
 
 After integration, capture representative actual Flutter runtime screen(s)
 for the changed flow, at the affected widths and themes per PRODUCT.md.
-Use existing local simulator/browser and preview tooling. Prefer one stable
+Use the installed CLI launch/capture on one explicit representative target; capture receipts are candidate-bound. For meaningful interaction, use a scripted scenario or inspect actual state before capturing. Prefer one stable
 runtime session and targeted refresh over rebuilding every platform. If
 isolated fixture data is needed, use the real screen and design system;
 never ship demo data or erase real records. Static mockups, SVGs and Ahem
