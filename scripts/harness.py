@@ -220,9 +220,10 @@ def begin(root, c, name):
     output(status="PASS", branch=name, base=base)
 
 
-def doctor(root, c, operation):
+def doctor(root, c, operation, only=None):
+    require(only is None or operation=="visual", "--only is for visual preflight")
     if operation == "visual":
-        visual_preflight(root, c)
+        visual_preflight(root, c, only)
         return
     needed = {"check": ("git", "flutter", "dart", "python3"),
               "deliver": ("git", "gh"), "android": ("flutter", "adb"),
@@ -330,7 +331,7 @@ def completion(root, c):
     manifest = read_json(work(root) / "delivery.json")
     require(all(result.get(k) == v for k, v in {
         "status": "PASS", "head": head, "digest": digest, "branch": name,
-        "base": c["integration_branch"], "repo": origin_repo(root),
+        "base": c["integration_branch"], "repo": origin_repo(root), "revision":c["revision"],
         "manifest_digest": manifest_digest(manifest), "checked_at": receipt.get("checked_at"),
     }.items()) and isinstance(result.get("delivered_at"), int),
             "Missing/stale delivery evidence; resume canonical deliver")
@@ -357,6 +358,7 @@ def deliver(root, c):
     require(receipt.get("status") == "PASS" and receipt.get("digest") == digest,
             "Missing/stale standard check receipt; run check")
     manifest = read_json(work(root) / "delivery.json")
+    visual = visual_evidence(root,manifest.get("visual_interaction") is True,emit=False) if manifest.get("visual_required") is True else None
     required_e2e = manifest.get("required_e2e", [])
     require(isinstance(required_e2e, list) and all(p in ("android", "ios", "web") for p in required_e2e), "Invalid required_e2e")
     for platform in required_e2e:
@@ -390,7 +392,7 @@ def deliver(root, c):
     existing = pr_list(root, repo, name)
     require(not existing or existing.get("baseRefName") == base,
             "Existing PR targets another base")
-    identity = {"branch": name, "base": base, "repo": repo, "digest": digest,
+    identity = {"branch": name, "base": base, "repo": repo, "digest": digest, "revision":c["revision"],
                 "manifest_digest": manifest_digest(manifest)}
     def checkpoint(stage, **extra):
         atomic_json(work(root) / "delivery-state.json", {**identity, "stage": stage, **extra})
@@ -412,7 +414,9 @@ def deliver(root, c):
     head = text(git(root, "rev-parse", "HEAD"))
     checkpoint("delivery-committed", head=head)
     body = work(root) / "pr-body.md"
-    summary = ["", "", "## Harness evidence (generated)", f"- Candidate: {digest}", "- Standard check: PASS"]
+    summary = ["", "", "## Harness evidence (generated)", f"- Harness revision: {c['revision']}", f"- Candidate: {digest}", "- Standard check: PASS"]
+    if visual:
+        summary.append(f"- Visual evidence: {visual['evidence_digest']}")
     for platform in required_e2e:
         summary.append(f"- Required {platform} E2E: PASS")
     expected_body = manifest["body"].rstrip() + "\n".join(summary) + "\n"
@@ -565,10 +569,11 @@ def save_preflight(root,ready,unavailable):
     return report
 
 
-def visual_preflight(root,c):
+def visual_preflight(root,c,only=None):
     pin = pinned_target(root)
+    require(not pin or only in (None,pin[0]), "Required platform differs from pinned task target")
     unavailable = []
-    for platform,target in ([pin] if pin else runtime_targets(root,c)):
+    for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
         try:
             dimensions = probe_runtime(root,platform,target)
         except (Blocked,OSError,ValueError,subprocess.TimeoutExpired) as exc:
@@ -581,12 +586,13 @@ def visual_preflight(root,c):
     raise Blocked("No capture-capable selected runtime target")
 
 
-def launch_auto(root,c):
+def launch_auto(root,c,only=None):
     """First successful launch pins the task target. No silent platform switch
     after baseline, no boot/install/reset of devices, no all-platform build."""
     pin = pinned_target(root)
+    require(not pin or only in (None,pin[0]), "Required platform differs from pinned task target")
     unavailable = []
-    for platform,target in ([pin] if pin else runtime_targets(root,c)):
+    for platform,target in ([pin] if pin else runtime_targets(root,c,only)):
         try:
             dimensions = probe_runtime(root,platform,target)
             result = launch(root,c,platform,target,preprobed=True,emit=False)
@@ -709,7 +715,7 @@ def capture(root, platform, label, theme, viewport, settle=1.5, scenario=None):
     output(status="CAPTURED", path=str(image), digest=digest)
 
 
-def visual_evidence(root, require_interaction=False):
+def visual_evidence(root, require_interaction=False, *, emit=True):
     """Validate receipt coverage, not aesthetic quality or truthful UI content."""
     digest = fingerprint(root)
     plan_path = work(root) / "visual-plan.json"
@@ -723,7 +729,7 @@ def visual_evidence(root, require_interaction=False):
     baseline = plan.get("baseline")
     require(isinstance(baseline, dict), "Declare baseline digest/label or unavailable reason")
     preflight_path = work(root) / "visual-preflight.json"
-    require(preflight_path.is_file(), "Run doctor visual before runtime work")
+    require(preflight_path.is_file(), "Run launch auto (or doctor visual) before runtime work")
     preflight = read_json(preflight_path)
     require(preflight.get("status") == "PASS" and preflight.get("branch") == text(git(root,"branch","--show-current")),
             "Visual preflight missing or from another task branch")
@@ -800,7 +806,8 @@ def visual_evidence(root, require_interaction=False):
         {k:v for k,v in item.items() if k != "path"} for item in captures]})
     result = {"status":"PASS", "digest":digest, "evidence_digest":evidence_digest,
               "captures":captures, "plan":plan, "baseline":baseline_receipt}
-    output(**result)
+    if emit:
+        output(**result)
     return result
 
 
@@ -888,6 +895,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("doctor")
     p.add_argument("operation", choices=("check","deliver","android","ios","web","e2e","visual"))
+    p.add_argument("--only", choices=("ios","android","web"))
     p = sub.add_parser("revision")
     p.add_argument("--expect")
     p = sub.add_parser("begin")
@@ -902,6 +910,7 @@ def main():
     p = sub.add_parser("launch")
     p.add_argument("platform", choices=("auto","android","ios","web"))
     p.add_argument("--device")
+    p.add_argument("--only", choices=("ios","android","web"))
     p = sub.add_parser("capture")
     p.add_argument("platform", choices=("android","ios","web"))
     p.add_argument("label")
@@ -930,7 +939,7 @@ def main():
         if a.command in ("begin","check","ci","deliver","verify","completion","launch","capture","visual-evidence","e2e"):
             installed_revision(root,c)
         if a.command == "doctor":
-            doctor(root, c, a.operation)
+            doctor(root, c, a.operation, a.only)
         elif a.command == "begin":
             begin(root, c, a.branch)
         elif a.command == "check":
@@ -960,8 +969,9 @@ def main():
         elif a.command == "launch":
             if a.platform == "auto":
                 require(a.device is None,"Use HARNESS_IOS_DEVICE/HARNESS_ANDROID_DEVICE for preference")
-                launch_auto(root,c)
+                launch_auto(root,c,a.only)
             else:
+                require(a.only is None,"--only is for launch auto")
                 launch(root,c,a.platform,a.device)
         elif a.command == "capture":
             capture(root, a.platform, a.label, a.theme, a.viewport, a.settle, a.scenario)

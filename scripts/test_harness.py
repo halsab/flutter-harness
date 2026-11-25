@@ -106,6 +106,14 @@ class Lifecycle(unittest.TestCase):
             probe.assert_called_once_with(self.root,"ios","phone")
             self.assertEqual(h.read_json(h.work(self.root)/"visual-preflight.json")["ready"][0]["platform"],"ios")
 
+    def test_required_platform_never_falls_back(self):
+        with patch.object(h,"runtime_targets",return_value=[("android","emu")]) as discovery, \
+             patch.object(h,"probe_runtime",side_effect=h.Blocked("Android unavailable")):
+            with self.assertRaisesRegex(h.Blocked,"No runtime target"):
+                h.launch_auto(self.root,self.c,"android")
+            discovery.assert_called_once_with(self.root,self.c,"android")
+            self.assertIsNone(h.pinned_target(self.root))
+
     def test_device_preference_and_stable_phone_selection(self):
         devices=[{"id":"tablet","name":"iPad","targetPlatform":"ios","emulator":True},
                  {"id":"b","name":"iPhone Z","targetPlatform":"ios","emulator":True},

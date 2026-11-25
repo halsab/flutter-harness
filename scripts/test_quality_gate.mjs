@@ -206,7 +206,9 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
 
 test("combined production hooks reserve no reviewer before evidence and bind actual approval",async t=>{
   const {root}=await fixture(t);
-  const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
+  const values=new Map([["task/main",{active:true,request:"Измени кнопку сортировки"}]]);
+  await mkdir(join(root,".flutter-harness/work"),{recursive:true});
+  await writeFile(join(root,".flutter-harness/work/delivery.json"),JSON.stringify({visual_required:true,visual_interaction:true}));
   const hooks={}, children=new Map([["main",{}]]);
   let ready=false, visualDigest="one", quality;
   const ctx={
@@ -216,7 +218,8 @@ test("combined production hooks reserve no reviewer before evidence and bind act
     session:{get:async({sessionID})=>children.get(sessionID),context:async()=>[{type:"assistant",content:[{type:"text",text:"VISUAL: PASS\nVERDICT: PASS"}]}]},
   };
   const resources=await registerResourceGuard(ctx,id=>"task/"+id,id=>quality.inputs(id),(e,i)=>quality.prepareReview(e,i));
-  quality=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{
+  quality=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async(interaction)=>{
+    assert.equal(interaction,true);
     if(!ready)throw Error("missing menu");
     return {evidence_digest:visualDigest,captures:[{path:"menu.png"}]};
   },resources.status,true,resources.reviewAvailability);
