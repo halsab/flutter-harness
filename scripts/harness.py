@@ -257,6 +257,22 @@ def doctor(root, c, operation, only=None):
     require(not missing, "Missing required prerequisites")
 
 
+def current_check(root,digest):
+    """Read the canonical receipt only when no verification owns the lock."""
+    folder=work(root)
+    folder.mkdir(parents=True,exist_ok=True)
+    with (folder/"check.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock,fcntl.LOCK_SH|fcntl.LOCK_NB)
+        except BlockingIOError:
+            return False
+        receipt=folder/"check.json"
+        if not receipt.is_file():
+            return False
+        value=read_json(receipt)
+        return value.get("status")=="PASS" and value.get("digest")==digest
+
+
 def check(root, c):
     folder = work(root)
     folder.mkdir(parents=True,exist_ok=True)
@@ -449,8 +465,8 @@ def deliver(root, c):
     name = branch(root, c["integration_branch"])
     receipt = read_json(work(root) / "check.json")
     digest = fingerprint(root)
-    require(receipt.get("status") == "PASS" and receipt.get("digest") == digest,
-            "Missing/stale standard check receipt; run check")
+    require(current_check(root,digest),
+            "Missing/stale standard check receipt or check running; run check")
     manifest = delivery_manifest(root,c)
     visual = visual_evidence(root,manifest.get("visual_interaction") is True,emit=False) if manifest.get("visual_required") is True or manifest.get("visual_interaction") is True else None
     required_e2e = manifest.get("required_e2e", [])
@@ -1224,7 +1240,7 @@ def main():
             digest = fingerprint(root)
             output(branch=text(git(root,"branch","--show-current")),
                    base=c["integration_branch"], revision=c.get("revision"), changed=dirty(root), digest=digest,
-                   checked=receipt.exists() and read_json(receipt).get("status")=="PASS" and read_json(receipt).get("digest")==digest)
+                   checked=current_check(root,digest))
         elif a.command == "scaffold":
             scaffold(root, a.name, a.layers)
         elif a.command == "adopt":

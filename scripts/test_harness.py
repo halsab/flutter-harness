@@ -99,8 +99,11 @@ class Lifecycle(unittest.TestCase):
     def test_check_cannot_run_concurrently(self):
         with (h.work(self.root)/"check.lock").open("a") as lock:
             h.fcntl.flock(lock,h.fcntl.LOCK_EX|h.fcntl.LOCK_NB)
+            self.receipt(["lib/main.dart"])
+            self.assertFalse(h.current_check(self.root,h.fingerprint(self.root)))
             with self.assertRaisesRegex(h.Blocked,"already running"):
                 h.check(self.root,self.c)
+        self.assertTrue(h.current_check(self.root,h.fingerprint(self.root)))
 
     def test_duplicate_begin_keeps_task_receipt(self):
         path = h.work(self.root)/"task.json"
@@ -138,7 +141,7 @@ class Lifecycle(unittest.TestCase):
 
     def test_capture_reuse_requires_exact_image_and_scenario(self):
         p=self.write(".flutter-harness/work/capture.png","")
-        data=h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"
+        data=h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"+b"crc!"
         p.write_bytes(data)
         expected={"scenario_sha256":"abc","digest":"candidate"}
         h.atomic_json(p.with_suffix(".json"),{**expected,"size":[390,844],"sha256":hashlib.sha256(data).hexdigest()})

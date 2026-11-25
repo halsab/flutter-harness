@@ -1,6 +1,6 @@
 # Execution v3 — controller decision and migration
 
-Status: proposed target; stage 1 implemented by this PR. No production claim for the future controller.
+Status: hardened existing execution path; external controller is a deferred design option, not a release dependency. No production claim for the future controller.
 
 ## Evidence: Lab #38, #39 and interrupted add-dialog trial
 
