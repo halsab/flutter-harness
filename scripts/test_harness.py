@@ -56,6 +56,18 @@ class Lifecycle(unittest.TestCase):
         h.atomic_json(h.work(self.root)/"check.json", {"status":"PASS","digest":h.fingerprint(self.root),"checked_at":123})
         h.atomic_json(h.work(self.root)/"delivery.json",{"files":files,"message":"feat: change","title":"Change","body":"Verified","required_e2e":[]})
 
+    def test_installed_cli_does_not_dirty_clean_project(self):
+        import sys
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        digest = h.fingerprint(self.root)
+        cli = self.root / ".flutter-harness/bin/harness.py"
+        for command in ("fingerprint", "status"):
+            subprocess.run([sys.executable, str(cli), command], cwd=self.root,
+                           check=True, capture_output=True)
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        self.assertEqual(h.fingerprint(self.root), digest)
+        self.assertFalse((cli.parent / "__pycache__").exists())
+
     def test_revision_mismatch_blocks_before_branch_switch(self):
         self.assertEqual(h.installed_revision(self.root,self.c)["revision"],self.c["revision"])
         with self.assertRaisesRegex(h.Blocked,"expected"):

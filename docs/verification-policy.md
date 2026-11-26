@@ -5,7 +5,7 @@ candidate, then delivery. Check runs dependency resolution, formatting,
 product conventions, analyzer and fast Flutter tests. CI independently
 checks formatting without rewriting files. Use focused unit/widget tests
 for material changed behavior and error paths; no test quotas or duplicate
-all-platform scenarios. A green old suite is not proof of new behavior.
+all-platform scenarios. A green old suite is not proof of new behavior. For a bug, reproduce the original failure (or establish a precise static proof), fix the cause and verify the original scenario; retain material executable regression protection.
 
 Risk-based review covers interacting behavior, persistent/destructive
 operations, native/platform configuration, security, large diffs and
@@ -15,6 +15,8 @@ model/variant, matching candidate and final VERDICT: PASS. For visual risk,
 also require current candidate planned screen/interaction light/dark capture receipts before dispatch, and bind review to the exact evidence digest plus VISUAL: PASS
 immediately before VERDICT: PASS. Read PRODUCT/DESIGN for actual UX criteria.
 Screenshots do not prove interaction correctness.
+
+Each blocking review finding names a violated requirement/invariant, source or runtime location, reachable scenario, expected/actual result, impact and evidence. A read-only reviewer may prove a defect statically, cite existing execution/capture evidence, or hand the smallest reproduction to Build; it must not claim execution it did not perform. Unconfirmed hypotheses and preferences are not blocking defects. Missing required evidence remains BLOCKED. Do not introduce an additional reviewer or a rigid finding parser; semantic quality stays with the existing reviewer and parent.
 
 For critical native/browser acceptance use one relevant executable scenario.
 Declare required_e2e in delivery.json; CLI e2e runs actual tools on the

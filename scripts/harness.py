@@ -17,6 +17,10 @@ import sys
 import tempfile
 import time
 
+# Installed modules must not create untracked artifacts or alter the candidate.
+sys.dont_write_bytecode = True
+import reporter
+
 HERE = Path(__file__).resolve().parent
 PNG = b"\x89PNG\r\n\x1a\n"
 
@@ -562,6 +566,8 @@ def deliver(root, c):
         if state:
             if isinstance(exc, DeliveryBlocked):
                 failure = exc
+                if failure.stage is None:
+                    failure.stage = state["stage"]
             elif isinstance(exc, Blocked) and "\n" not in str(exc) and "exit=" not in str(exc):
                 failure = DeliveryBlocked("DELIVERY_INVARIANT", str(exc)[:240])
             else:
@@ -1258,6 +1264,8 @@ def main():
     p.add_argument("--expect")
     p = sub.add_parser("begin")
     p.add_argument("branch")
+    p = sub.add_parser("lesson", help="Record a confirmed reusable Harness failure, never app details")
+    p.add_argument("code", choices=sorted(reporter.SEMANTIC_CODES))
     for cmd in ("check","ci","deliver","verify","completion","status","fingerprint","stop-preview","adopt"):
         sub.add_parser(cmd)
     p = sub.add_parser("capture-plan")
@@ -1322,7 +1330,11 @@ def main():
         if a.command == "doctor":
             doctor(root, c, a.operation, a.only)
         elif a.command == "begin":
+            reporter.retry(root)
             begin(root, c, a.branch)
+        elif a.command == "lesson":
+            installed_revision(root,c)
+            output(status=reporter.report(root,c.get("revision"),a.code))
         elif a.command == "check":
             check(root, c)
         elif a.command == "ci":
@@ -1383,6 +1395,8 @@ def main():
                       reason=str(exc)[:240] if isinstance(exc, Blocked) and "\n" not in str(exc) and "exit=" not in str(exc) else "See local command log/terminal")
             except OSError:
                 pass
+        if a.command == "deliver" and isinstance(exc, DeliveryBlocked):
+            reporter.report(root, locals().get("c", {}).get("revision"), exc.code, automatic=True, stage=exc.stage)
         if a.command == "completion" and isinstance(exc, DeliveryBlocked):
             output(status="BLOCKED", stage=exc.stage, error=exc.details())
         if a.command == "deliver" and isinstance(exc, DeliveryBlocked) and isinstance(exc.__cause__, Blocked):

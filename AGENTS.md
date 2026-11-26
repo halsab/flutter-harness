@@ -8,6 +8,6 @@ and update canonical docs/tests with runtime changes. Preserve product
 foundation and owner-only merge. Do not weaken gates to obtain green CI.
 
 Run Bash syntax checks, Python unittest discovery, Node guard tests and
-the existing real starter CI. No extra device or model evaluation suite.
+the existing real starter CI. No extra device or model evaluation suite. For reusable Harness gaps, reproduce the failure, add the smallest durable regression protection and remove superseded rules where safe. Use the existing Lab for explicit before/after evaluations (docs/engineering-evolution.md), not as an additional per-task gate.
 Report exact outcomes and limitations. Stage only task files, never merge
 or force-push automatically.

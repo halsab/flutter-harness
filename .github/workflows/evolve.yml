@@ -1,0 +1,178 @@
+name: Harness evolution
+on:
+  schedule:
+    # Two automatic investigations per week at most; one report per run.
+    - cron: '23 4 * * 1,4'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing canonical Harness report number
+        required: true
+        type: number
+permissions:
+  contents: read
+concurrency:
+  group: harness-evolution
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'halsab/flutter-harness' && github.actor == github.repository_owner && vars.HARNESS_EVOLUTION_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    outputs:
+      ready: ${{ steps.prepare.outputs.ready }}
+      number: ${{ steps.prepare.outputs.number }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate canonical owner issue and skip existing fix
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' && secrets.HARNESS_EVOLUTION_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIGURED" != "true" ]]; then
+            echo "Evolution credentials not configured; leave reports pending."
+            exit 0
+          fi
+          args=()
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            args=(--number "$ISSUE_NUMBER")
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/issues" --method GET -f state=all -f creator=halsab -f per_page=100 --paginate --slurp > "$RUNNER_TEMP/issues.json"
+          ISSUE_NUMBER="$(python3 scripts/evolution.py select "$RUNNER_TEMP/issues.json" "$RUNNER_TEMP/prompt.txt" "${args[@]}")"
+          if [[ -z "$ISSUE_NUMBER" ]]; then
+            echo "No new canonical report; no model call."
+            exit 0
+          fi
+          if [[ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "evolution/issue-$ISSUE_NUMBER" --state all --json number --jq length)" != 0 ]]; then
+            echo "Existing PR; skip."
+            exit 0
+          fi
+          # Reserve the attempt before any paid work; reruns do not retry automatically.
+          gh label create harness-evolution-attempted --repo "$GITHUB_REPOSITORY" --color 6F42C1 --description "One evolution investigation reserved" --force
+          gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER/labels" --method POST -f 'labels[]=harness-evolution-attempted' >/dev/null
+          echo "number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: steps.prepare.outputs.ready == 'true'
+        with:
+          name: evolution-prompt
+          path: ${{ runner.temp }}/prompt.txt
+          retention-days: 1
+  investigate:
+    needs: prepare
+    if: needs.prepare.outputs.ready == 'true' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: evolution-prompt
+          path: ${{ runner.temp }}/evolution-prompt
+      - name: Investigate and reproduce in isolated workspace
+        uses: openai/codex-action@306c6a196a99dcc6582530c396a19d2672d5e9ec
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: ${{ runner.temp }}/evolution-prompt/prompt.txt
+          permission-profile: ':workspace'
+          safety-strategy: drop-sudo
+          model: gpt-6-luna
+          effort: low
+      - name: Export proposed patch only
+        run: |
+          set -euo pipefail
+          git add -A
+          git diff --cached --binary > "$RUNNER_TEMP/evolution.patch"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evolution-patch
+          path: ${{ runner.temp }}/evolution.patch
+          retention-days: 1
+  verify:
+    needs: [prepare, investigate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.verify.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: evolution-patch
+          path: ${{ runner.temp }}/evolution-patch
+      - name: Validate patch using original policy, then run existing checks
+        id: verify
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/evolution-patch/evolution.patch"
+          if [[ ! -s "$patch" ]]; then
+            echo "No reproduced defect or proposed patch; issue stays open."
+            exit 0
+          fi
+          cp scripts/evolution.py scripts/reporter.py "$RUNNER_TEMP/"
+          git apply --index "$patch"
+          python3 "$RUNNER_TEMP/evolution.py" prove-regression
+          # Installer tests require a clean, committed source revision.
+          git -c user.name=Harness -c user.email=harness@example.invalid -c core.hooksPath=/dev/null commit -m "isolated verification candidate"
+          for script in scripts/*.sh; do bash -n "$script"; done
+          python3 scripts/validate-opencode.py templates/opencode-mobile.jsonc mobile
+          python3 scripts/validate-opencode.py templates/opencode-mobile-web.jsonc mobile-web
+          node --test scripts/test_delivery_guard.mjs scripts/test_quality_gate.mjs scripts/test_resources.mjs
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+  publish:
+    needs: [prepare, verify]
+    if: needs.verify.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: evolution-patch
+          path: ${{ runner.temp }}/evolution-patch
+      - name: Apply validated patch without executing candidate code
+        run: |
+          set -euo pipefail
+          cp scripts/evolution.py scripts/reporter.py "$RUNNER_TEMP/"
+          git apply --index "$RUNNER_TEMP/evolution-patch/evolution.patch"
+          python3 "$RUNNER_TEMP/evolution.py" validate-patch
+      - name: Publish one owner-reviewed PR
+        env:
+          GH_TOKEN: ${{ secrets.HARNESS_EVOLUTION_TOKEN }}
+          ISSUE_NUMBER: ${{ needs.prepare.outputs.number }}
+        run: |
+          set -euo pipefail
+          [[ -n "$GH_TOKEN" && "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          branch="evolution/issue-$ISSUE_NUMBER"
+          if [[ "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state all --json number --jq length)" != 0 ]]; then exit 0; fi
+          git switch -c "$branch"
+          git -c user.name="Harness Evolution" -c user.email="harness-evolution@users.noreply.github.com" -c core.hooksPath=/dev/null commit -m "fix: investigate Harness report #$ISSUE_NUMBER"
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin "HEAD:refs/heads/$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --title "Harness evolution: report #$ISSUE_NUMBER" --body "Closes #$ISSUE_NUMBER. Automated regression candidate; new tests failed on original source and all deterministic checks ran in an isolated job. Full PR CI and owner review are required."
