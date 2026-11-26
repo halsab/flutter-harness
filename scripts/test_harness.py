@@ -68,6 +68,28 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(h.fingerprint(self.root), digest)
         self.assertFalse((cli.parent / "__pycache__").exists())
 
+    def test_begin_on_already_switched_new_branch_clears_previous_receipts(self):
+        old = h.read_json(h.work(self.root)/"task.json")
+        self.write(".flutter-harness/work/check.json", '{"status":"PASS"}')
+        self.write(".flutter-harness/work/delivery-result.json", '{"status":"PASS"}')
+        self.git("switch","-c","feature/next","origin/trunk")
+        h.begin(self.root,self.c,"feature/next")
+        current = h.read_json(h.work(self.root)/"task.json")
+        self.assertEqual(current["branch"],"feature/next")
+        self.assertGreaterEqual(current["started_at"],old["started_at"])
+        self.assertFalse((h.work(self.root)/"check.json").exists())
+        self.assertFalse((h.work(self.root)/"delivery-result.json").exists())
+        h.begin(self.root,self.c,"feature/next")
+        self.assertEqual(h.read_json(h.work(self.root)/"task.json"),current)
+
+    def test_diagnostics_uses_latest_task_in_same_session(self):
+        for task in ("first","second"):
+            h.event(self.root,"task-start",session="same",task=task)
+            h.event(self.root,"task-complete",session="same",task=task)
+        h.diagnostics(self.root,["same"],local_only=True)
+        result=h.read_json(h.work(self.root)/"diagnostics.json")
+        self.assertEqual([event.get("task") for event in result["events"]],["second","second"])
+
     def test_revision_mismatch_blocks_before_branch_switch(self):
         self.assertEqual(h.installed_revision(self.root,self.c)["revision"],self.c["revision"])
         with self.assertRaisesRegex(h.Blocked,"expected"):
