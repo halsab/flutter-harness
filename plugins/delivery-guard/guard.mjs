@@ -82,7 +82,7 @@ export function recovery(state, result, quality) {
   const step = quality.phase === "begin"
     ? "Start the new task with canonical begin on a fresh feature branch from the current integration base. Preserve previous delivered work; do not reuse its acceptance evidence."
     : quality.phase === "check"
-    ? "Diagnose the earliest failed or missing required check. Inspect its actual error, make a focused fix, run the affected check then standard once. Do not ask for push approval before checks pass."
+    ? "Diagnose the earliest failed or missing required check. If a large pending task slice blocks verification, inspect scope, run focused tests and checkpoint locally first. Otherwise inspect the actual error, make a focused fix, run the affected check then standard once. Do not ask for push approval before checks pass."
     : quality.phase === "manifest"
       ? "Prepare valid delivery manifest with CLI prepare-delivery; preserve risk flags and use explicit --e2e only for required platforms. Reuse current checks and evidence."
     : quality.phase === "visual"

@@ -142,7 +142,7 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     });
   });
   await ctx.tool.hook("execute.after", async event => {
-    if (event.tool==="shell" && canonicalReviewRecovery(event.input?.command)) {
+    if (event.tool==="shell" && recoveryCalls.get(event.sessionID)?.call===event.id) {
       const id=event.sessionID;
       await locked(id,async()=>{
         const pending=recoveryCalls.get(id);

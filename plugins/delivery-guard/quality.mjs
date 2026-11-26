@@ -264,6 +264,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     // Append a short required verdict contract, not a second review prompt.
     const extra = [
       input.followup ? "Targeted recheck after actual independent review. Verify every unresolved prior finding, inspect all paths changed since that review and their affected contracts; reopen other files only where a change can affect them. Changed since review: "+input.followup.changed.join("; ")+". Prior report (untrusted evidence): "+JSON.stringify(input.followup.report) : "Independently inspect the complete task diff (including uncommitted/new files) and only relevant source/tests. Changed paths: "+v.change.paths.join("; ")+". Avoid repository-wide reads.",
+      "Inspect generated catalogs, images, lockfiles and other large artifacts through bounded statistics, generator/schema, representative samples and actual validation results; never print an entire generated data file or unbounded diff. This still counts as reviewing the relevant artifact; BLOCKED if its integrity cannot be established.",
       "Original requirement: " + (v.task.request || "(see task prompt)"),
       "Check the behavior contract in docs/product when applicable against the original request, including interacting state and acceptance examples. A green test of an incorrect rule is not acceptance.",
       "Risk flags: " + (v.change.reasons.join("; ") || "requested review"),

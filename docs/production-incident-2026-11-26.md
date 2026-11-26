@@ -15,3 +15,5 @@ The Vaqtpro task implemented location selection but did not deliver any commit/P
 - Migrate or safely salvage an already-blocked app checkout separately; never overwrite its active dirty work.
 
 Acceptance: regression suite and CI green, then repeat the same production scenario on a fresh task with no routine owner UI interaction and a verified delivery receipt. Compare local diagnostics and usage rather than inventing savings.
+
+The pending-diff guard now enforces a local checkpoint at expensive standard/runtime boundaries for broad uncommitted source/test changes. Review instructions use bounded inspection of generated catalogs to avoid loading megabytes of data into model context.

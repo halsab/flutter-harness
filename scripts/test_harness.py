@@ -185,7 +185,7 @@ class Lifecycle(unittest.TestCase):
         h.atomic_json(h.work(self.root)/"check.json",{"status":"PASS","digest":digest})
         h.atomic_json(h.work(self.root)/"runtime.json",{"platform":"ios","device":"phone","digest":digest})
         h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
-        plan={"platform":"ios","scenarios":[{"label":"main","kind":"screen","scenario":"maestro/screen.yaml"},
+        plan={"platform":"ios","fixture":"isolated test data","scenarios":[{"label":"main","kind":"screen","scenario":"maestro/screen.yaml"},
                 {"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml"}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json",plan)
         with patch.object(h,"capture") as cap,patch.object(h,"visual_evidence") as evidence:
@@ -517,6 +517,24 @@ class Lifecycle(unittest.TestCase):
         with patch.object(h,"origin_repo",return_value="owner/repo"),patch.object(h,"canonical_repo",return_value=("owner/repo","1")),patch.object(h,"pr_list",return_value={**pr,"isDraft":False}):
             with self.assertRaisesRegex(h.Blocked,"ready"):
                 h.save_draft(self.root,self.c)
+
+    def test_large_uncommitted_slice_stops_expensive_check_and_runtime(self):
+        self.write("lib/large.dart","// generated\n"*401)
+        with patch.object(h,"check_candidate") as check:
+            with self.assertRaisesRegex(h.Blocked,"checkpoint before expensive verification"):
+                h.check(self.root,self.c)
+            check.assert_not_called()
+        with patch.object(h,"probe_runtime") as probe:
+            with self.assertRaisesRegex(h.Blocked,"checkpoint before expensive verification"):
+                h.launch_auto(self.root,self.c)
+            probe.assert_not_called()
+        h.checkpoint_local(self.root,self.c,"feat: save coherent slice")
+        with patch.object(h,"check_candidate") as check:
+            h.check(self.root,self.c)
+            check.assert_called_once()
+        self.write("lib/large.dart","// changed\n"*401)
+        with self.assertRaisesRegex(h.Blocked,"Large uncommitted task slice"):
+            h.require_checkpoint(self.root,self.c)
 
     def test_identical_successful_check_reused(self):
         self.write("lib/main.dart","verified")

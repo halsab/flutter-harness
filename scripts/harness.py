@@ -301,6 +301,40 @@ def begin(root, c, name):
     output(status="PASS", branch=name, base=base)
 
 
+def require_checkpoint(root,c):
+    """Bound the pending source/test diff at expensive verification boundaries.
+    No arbitrary commit quotas: small fixes may still go directly to delivery.
+    Large work must be preserved locally, without claiming acceptance.
+    """
+    task_path=work(root)/"task.json"
+    if not task_path.is_file():
+        return
+    task=read_json(task_path)
+    if (task.get("branch")!=text(git(root,"branch","--show-current")) or
+            task.get("revision")!=c["revision"] or
+            (work(root)/"delivery-state.json").exists()):
+        return
+    def measured(path):
+        return path.startswith(("lib/","test/","integration_test/")) or path=="pubspec.yaml"
+    pending=[p for p in dirty(root) if measured(p)]
+    if not pending:
+        return
+    lines=0
+    for row in paths(git(root,"diff","--no-renames","--numstat","-z","HEAD","--","lib","test","integration_test","pubspec.yaml")):
+        fields=row.split("\t",2)
+        if len(fields)==3:
+            lines+=401 if "-" in fields[:2] else int(fields[0])+int(fields[1])
+    for name in paths(git(root,"ls-files","--others","--exclude-standard","-z","--","lib","test","integration_test","pubspec.yaml")):
+        path=root/name
+        if path.is_symlink():
+            lines+=401
+        else:
+            data=path.read_bytes()
+            lines+=401 if b"\0" in data else data.count(b"\n")+(bool(data) and not data.endswith(b"\n"))
+    require(len(pending)<=8 and lines<=400,
+            f"Large uncommitted task slice ({len(pending)} source/test files, {lines} changed lines); inspect scope, run focused tests and checkpoint before expensive verification")
+
+
 def checkpoint_local(root, c, message):
     """Save a coherent task slice without publishing or claiming acceptance."""
     name = branch(root, c["integration_branch"])
@@ -383,6 +417,7 @@ def check(root, c):
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:
             raise Blocked("Standard check already running; inspect check-attempt.json")
+        require_checkpoint(root,c)
         receipt_path = folder / "check.json"
         if receipt_path.is_file():
             prior = read_json(receipt_path)
@@ -959,6 +994,7 @@ def launch_auto(root,c,only=None,fresh=False):
     require(task.get("branch")==text(git(root,"branch","--show-current")) and task.get("revision")==c["revision"],
             "Runtime task receipt is stale; begin on the correct branch")
     if digest != task.get("baseline_digest"):
+        require_checkpoint(root,c)
         require(current_check(root,digest),
                 "Run the canonical check on the changed candidate before building runtime")
     unavailable = []
@@ -996,6 +1032,7 @@ def launch_auto(root,c,only=None,fresh=False):
 
 
 def launch(root,c,platform,device,*,preprobed=False,emit=True):
+    require_checkpoint(root,c)
     require(platform != "web" or c["profile"] == "mobile-web", "Web disabled")
     digest = fingerprint(root)
     receipt = work(root) / "runtime.json"
@@ -1108,6 +1145,7 @@ def capture_plan(root,c,refresh=()):
     platform = plan.get("platform")
     pin = pinned_target(root)
     require(pin and pin[0]==platform,"Plan must use the pinned runtime")
+    require(isinstance(plan.get("fixture"),str) and plan["fixture"].strip(),"Describe isolated fixture data before capture-plan")
     items = plan.get("scenarios")
     require(isinstance(items,list) and 0<len(items)<=12,"Invalid visual scenarios")
     labels = set()
@@ -1123,6 +1161,8 @@ def capture_plan(root,c,refresh=()):
                 and not (root/path).is_symlink(),"Invalid batch scenario")
         require(platform!="web" or isinstance(item.get("viewport"),str) and re.fullmatch(r"\d+,\d+",item["viewport"]),
                 "Web batch scenario needs viewport")
+        require(platform=="web" or item.get("viewport") is None,"Native capture dimensions are read from the image")
+    require(any(item["kind"]=="screen" for item in items),"Missing populated screen scenario")
     digest = fingerprint(root)
     require(current_check(root,digest),"Check exact candidate before capture-plan")
     runtime = read_json(work(root)/"runtime.json")
