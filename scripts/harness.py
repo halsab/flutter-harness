@@ -290,7 +290,7 @@ def begin(root, c, name):
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
     if current != name or task.get("branch") != name:
-        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","draft-result.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
             (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
@@ -496,10 +496,10 @@ def pr_list(root, repo, name):
     return own[0] if own else None
 
 
-def validate_remote_pr(pr, repo, base, name, head):
+def validate_remote_pr(pr, repo, base, name, head, *, draft=False):
     if not (pr and pr.get("state") == "OPEN" and pr.get("baseRefName") == base and
             pr.get("headRefName") == name and pr.get("headRefOid") == head and
-            pr.get("isCrossRepository") is False and pr.get("isDraft") is False):
+            pr.get("isCrossRepository") is False and pr.get("isDraft") is draft):
         raise DeliveryBlocked("PR_IDENTITY_MISMATCH",
                               "PR missing, draft, stale, closed, cross-repo or targets the wrong branch")
     if not valid_pr_url(pr.get("url"), repo, pr.get("number")):
@@ -633,6 +633,57 @@ def prepare_delivery(root,c,a):
     delivery_manifest(root,c)
     output(status="PASS",branch=name,files=files,required_e2e=manifest["required_e2e"],
            visual_required=manifest["visual_required"],visual_interaction=manifest["visual_interaction"])
+
+
+def review_recovery(root,c):
+    """CLI precondition only. The Build hook records the one approved extension."""
+    task = read_json(work(root)/"task.json")
+    require(task.get("branch")==branch(root,c["integration_branch"]) and task.get("revision")==c["revision"],
+            "Review recovery requires the current task")
+    require(current_check(root,fingerprint(root)), "Review recovery needs current standard evidence")
+    delivery_manifest(root,c)
+    output(status="RECOVERY_REQUESTED", digest=fingerprint(root))
+
+
+def save_draft(root,c):
+    """Owner-approved backup, NOT acceptance, never a ready PR or receipt."""
+    base = c["integration_branch"]
+    name = branch(root,base)
+    task = read_json(work(root)/"task.json")
+    require(task.get("branch")==name and task.get("revision")==c["revision"],
+            "Draft backup requires current canonical begin")
+    require(not (work(root)/"delivery-result.json").exists(), "Task already delivered")
+    require(not dirty(root), "Save reviewed task scope with checkpoint first; no dirty draft push")
+    require(text(git(root,"merge-base",task["base_head"],"HEAD"))==task["base_head"] and
+            bool(git(root,"diff","--name-only",task["base_head"],"HEAD")),
+            "Draft backup needs committed task changes")
+    head = text(git(root,"rev-parse","HEAD"))
+    digest = fingerprint(root)
+    origin = origin_repo(root)
+    repo, repo_id = canonical_repo(root,origin)
+    existing = remote_call("PR_LIST",pr_list,root,repo,name)
+    if existing:
+        require(existing.get("isDraft") is True and existing.get("baseRefName")==base and
+                valid_pr_url(existing.get("url"),repo,existing.get("number")),
+                "Refuse to alter a ready or wrong-base PR during draft backup")
+    if not existing or existing.get("headRefOid")!=head:
+        require(not dirty(root) and fingerprint(root)==digest and
+                text(git(root,"rev-parse","HEAD"))==head, "Candidate changed before draft backup")
+        remote_call("GIT_PUSH",git,root,"push","-u","origin","HEAD:refs/heads/"+name)
+    if not existing:
+        body = work(root)/"draft-body.md"
+        body.write_text("**INCOMPLETE — NOT ACCEPTED. Do not merge.**\n\n"
+                        "Owner-approved backup of local work. Required Harness acceptance is not established. "
+                        "Only canonical delivery may make this PR ready.\n",encoding="utf-8")
+        remote_call("PR_CREATE",run,root,"gh","pr","create","--draft","--repo",repo,"--base",base,
+                    "--head",name,"--title","WIP: "+name,"--body-file",str(body),capture=True,timeout=60)
+    pr = validate_remote_pr(remote_call("PR_LIST",pr_list,root,repo,name),repo,base,name,head,draft=True)
+    require(not dirty(root) and fingerprint(root)==digest and text(git(root,"rev-parse","HEAD"))==head,
+            "Candidate changed during draft backup")
+    result={"status":"DRAFT_SAVED","branch":name,"head":head,"digest":digest,"pr":pr["url"],"repo_id":repo_id}
+    atomic_json(work(root)/"draft-result.json",result)
+    event(root,"draft-saved",**result)
+    output(**result)
 
 
 def deliver(root, c):
@@ -1352,7 +1403,7 @@ def main():
     p.add_argument("--message", required=True)
     p = sub.add_parser("lesson", help="Record a confirmed reusable Harness failure, never app details")
     p.add_argument("code", choices=sorted(reporter.SEMANTIC_CODES))
-    for cmd in ("check","ci","deliver","verify","completion","status","fingerprint","stop-preview","adopt"):
+    for cmd in ("check","ci","deliver","save-draft","review-recovery","verify","completion","status","fingerprint","stop-preview","adopt"):
         sub.add_parser(cmd)
     p = sub.add_parser("capture-plan")
     p.add_argument("--refresh",action="append",default=[],help="Recapture both themes of an explicitly changed UI state")
@@ -1411,7 +1462,7 @@ def main():
         if a.command == "revision":
             output(**installed_revision(root,c,a.expect))
             return 0
-        if a.command in ("begin","checkpoint","check","ci","deliver","verify","completion","launch","capture","capture-plan","prepare-delivery","validate-delivery","visual-evidence","e2e"):
+        if a.command in ("begin","checkpoint","check","ci","deliver","save-draft","review-recovery","verify","completion","launch","capture","capture-plan","prepare-delivery","validate-delivery","visual-evidence","e2e"):
             installed_revision(root,c)
         if a.command == "doctor":
             doctor(root, c, a.operation, a.only)
@@ -1431,6 +1482,10 @@ def main():
             run(root, "flutter", "pub", "get", log=work(root)/"pub-get.log")
             run(root, "bash", str(HERE/"check.sh"), ".", "standard", c["profile"])
             require(not git(root,"diff","--name-only","HEAD","--","pubspec.lock"), "Dependency lock changed in CI")
+        elif a.command == "save-draft":
+            save_draft(root,c)
+        elif a.command == "review-recovery":
+            review_recovery(root,c)
         elif a.command == "deliver":
             deliver(root, c)
         elif a.command == "verify":

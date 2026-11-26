@@ -500,6 +500,24 @@ class Lifecycle(unittest.TestCase):
         self.assertEqual(h.delivery_manifest(self.root,self.c)["files"],[])
         self.assertTrue(h.delivery_manifest(self.root,self.c)["review_required"])
 
+    def test_draft_backup_requires_clean_checkpoint_and_never_delivers(self):
+        self.write("lib/main.dart","work in progress")
+        with self.assertRaisesRegex(h.Blocked,"checkpoint first"):
+            h.save_draft(self.root,self.c)
+        h.checkpoint_local(self.root,self.c,"feat: save")
+        head=self.git("rev-parse","HEAD")
+        pr={"state":"OPEN","baseRefName":"trunk","headRefName":"feature/test",
+            "headRefOid":head,"isCrossRepository":False,"isDraft":True,"number":12,
+            "url":"https://github.com/owner/repo/pull/12"}
+        with patch.object(h,"origin_repo",return_value="owner/repo"),patch.object(h,"canonical_repo",return_value=("owner/repo","1")),patch.object(h,"pr_list",side_effect=[None,pr]),patch.object(h,"remote_call",side_effect=lambda op,fn,*args,**kwargs: fn(*args,**kwargs) if op=="PR_LIST" else None) as remote:
+            h.save_draft(self.root,self.c)
+            self.assertIn("--draft",next(c.args for c in remote.call_args_list if c.args[0]=="PR_CREATE"))
+        self.assertEqual(h.read_json(h.work(self.root)/"draft-result.json")["status"],"DRAFT_SAVED")
+        self.assertFalse((h.work(self.root)/"delivery-result.json").exists())
+        with patch.object(h,"origin_repo",return_value="owner/repo"),patch.object(h,"canonical_repo",return_value=("owner/repo","1")),patch.object(h,"pr_list",return_value={**pr,"isDraft":False}):
+            with self.assertRaisesRegex(h.Blocked,"ready"):
+                h.save_draft(self.root,self.c)
+
     def test_identical_successful_check_reused(self):
         self.write("lib/main.dart","verified")
         self.receipt(["lib/main.dart"])

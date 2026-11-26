@@ -114,3 +114,7 @@ The agent follows [the maintenance policy](docs/evolution-automation.md).
 Review the proposed PR and merge after CI passes. Then update installed
 Harness copies in application repositories using the installer in section 2.
 There is no need to analyze each Issue manually.
+
+### Blocked task recovery
+
+A Build agent saves local checkpoints without publication. If review is genuinely exhausted and you explicitly authorize another review, ask Build to use canonical `review-recovery` (one permission-gated extension for current evidence). If work is still incomplete and you want it backed up remotely, explicitly authorize `save-draft` in Build. It requires clean local commits and creates/updates a Draft PR, never a completed delivery receipt. The same task remains active until canonical `deliver` passes all gates. Never merge a draft or bypass acceptance.

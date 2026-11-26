@@ -1,4 +1,4 @@
-import { reviewVerdict } from "./quality.mjs";
+import { reviewVerdict, canonicalReviewRecovery } from "./quality.mjs";
 
 // Bound actual child dispatches, not model tokens. Use OpenCode session
 // outcome as execution evidence; a worker's text is not completion.
@@ -54,6 +54,7 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     }
     // Three substantive passes (initial plus two repairs), one technical
     // recovery and one dispute remain finite. Never rerun identical evidence.
+    if (state.recoveryGranted?.key===key && !state.recoveryUsed) return "";
     if (attempts.length >= 5) return "Harness: reviewer absolute attempt budget exhausted.";
     if (outcomes.filter((x,i)=>!attempts[i].dispute && (x==="PASS" || x==="CHANGES_REQUIRED")).length >= 3)
       return "Harness: substantive reviewer attempt budget exhausted.";
@@ -64,7 +65,22 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
   async function reviewAvailability(id, key) {
     return locked(id, async()=>budget(id,await read(id),key));
   }
+  const recoveryCalls=new Map();
   await ctx.tool.hook("execute.before", async event => {
+    if (event.tool==="shell" && canonicalReviewRecovery(event.input?.command)) {
+      const id=event.sessionID;
+      await locked(id,async()=>{
+        const task=await currentTask(id);
+        if (!task?.active || !task.id) throw Error("No active task for recovery");
+        const state=await read(id,task);
+        if (state.recoveryGranted || state.recoveryUsed) throw Error("Owner recovery already granted or used");
+        const input=await reviewInputs(id);
+        const why=await budget(id,state,input.key);
+        if (!why.includes("budget exhausted")) throw Error("Review recovery only applies to exhausted budgets for changed or recoverable inputs");
+        recoveryCalls.set(id,{call:event.id,task:task.id,key:input.key});
+      });
+      return;
+    }
     if (event.tool !== "subagent") return;
     const role = event.input?.agent;
     const id = event.sessionID;
@@ -109,13 +125,14 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
           const verdict=reviewVerdict(messages);
           const final=[...messages].reverse().find(m=>m.type==="assistant" && (typeof m.content==="string" ? m.content.trim() : m.content?.some(x=>x.type==="text" && x.text.trim())));
           const report=typeof final?.content==="string" ? final.content : final?.content?.filter(x=>x.type==="text").map(x=>x.text).join("\n");
-          if (child.outcome==="succeeded" && ["CHANGES_REQUIRED","PASS"].includes(verdict) && report && report.length<=16000) {
+          if (child.outcome==="succeeded" && ["CHANGES_REQUIRED","PASS"].includes(verdict) && report && report.length<=16000 && /(?:^|\n)COVERAGE: COMPLETE\s*$/m.test(report)) {
             const next=input.v.change.fileDigests;
             const changed=[...new Set([...Object.keys(prior.files),...Object.keys(next)])].filter(p=>prior.files[p]!==next[p]);
             input.followup={report,changed,visualChanged:prior.visualDigest!==input.visual?.evidence_digest};
           }
         }
         await prepareReview(event,input);
+        if (state.recoveryGranted?.key===input.key) state.recoveryUsed=true;
         state.reviews = [...(state.reviews || []),{call:event.id,key:input.key,dispute:!!input.dispute,files:input.v?.change?.fileDigests,visualDigest:input.visual?.evidence_digest}];
         await record(id,"review-dispatched",{call:event.id,model:event.input.model});
       }
@@ -125,6 +142,24 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     });
   });
   await ctx.tool.hook("execute.after", async event => {
+    if (event.tool==="shell" && canonicalReviewRecovery(event.input?.command)) {
+      const id=event.sessionID;
+      await locked(id,async()=>{
+        const pending=recoveryCalls.get(id);
+        if (pending?.call!==event.id) return;
+        recoveryCalls.delete(id);
+        if (event.status!=="completed" || event.result?.metadata?.exit!==0) return;
+        const task=await currentTask(id);
+        if (!task?.active || task.id!==pending.task) return;
+        const state=await read(id,task);
+        const input=await reviewInputs(id);
+        if (input.key!==pending.key || state.recoveryGranted || state.recoveryUsed || !(await budget(id,state,input.key)).includes("budget exhausted")) return;
+        state.recoveryGranted={key:input.key};
+        await ctx.storage.set(key(id,task),state);
+        await record(id,"review-owner-recovery-granted");
+      });
+      return;
+    }
     if (event.tool !== "subagent") return;
     const id = event.sessionID;
     await locked(id, async()=>{

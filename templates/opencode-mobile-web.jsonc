@@ -50,6 +50,16 @@
           "action": "shell",
           "resource": "python3 .flutter-harness/bin/harness.py deliver",
           "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 .flutter-harness/bin/harness.py save-draft",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "python3 .flutter-harness/bin/harness.py review-recovery",
+          "effect": "ask"
         }
       ]
     },
@@ -478,6 +488,16 @@
     {
       "action": "shell",
       "resource": "python3 .flutter-harness/bin/harness.py deliver",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "python3 .flutter-harness/bin/harness.py save-draft",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "python3 .flutter-harness/bin/harness.py review-recovery",
       "effect": "deny"
     }
   ]
