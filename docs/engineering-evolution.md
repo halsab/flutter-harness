@@ -16,10 +16,12 @@ No automatic merge, additional skills, default MCP or worker swarm.
 4. Keep app-specific tests and contracts in the app. Use the installed Reporter
    for confirmed reusable gaps; selected delivery errors are captured directly.
    No mandatory reflection call, managed-file edits or new delivery gate.
-5. Central Evolution processes validated owner reports and may propose a
-   separate regression-tested Harness PR. Unreproduced reports stay open.
+5. Reports accumulate in central Issues. On an explicit owner request, the
+   normal local OpenCode agent processes them and proposes a separate
+   regression-tested Harness PR. Unreproduced reports stay open.
    Roll out through the existing managed installer after owner approval.
-   Do not silently self-modify an installed Harness. See [automation](evolution-automation.md).
+   No scheduled model runs, separate API credentials or self-modification.
+   See [reporting and maintenance](evolution-automation.md).
 
 Example: missing data and corrupted persisted data must not share a success
 result when loss is possible. Fix the app repository contract and seed a

@@ -76,4 +76,4 @@ For material behavior, define invariants and verify the original user scenario.
 The read-only reviewer uses concrete evidence, not speculative refactoring.
 Confirmed reusable Harness gaps are reported to central GitHub Issues by the
 installed Reporter; application-specific regressions stay in the app. See
-[automated evolution setup](docs/evolution-automation.md). See [the evolution and Lab evaluation policy](docs/engineering-evolution.md).
+[automatic reporting and on-demand maintenance](docs/evolution-automation.md) and [the evolution and Lab evaluation policy](docs/engineering-evolution.md). No separate API credentials or scheduled coding agent.
