@@ -4,4 +4,4 @@ One task and one implementation agent; one read-only consultation at a time. Bou
 
 Do not spend a separate model call on reflection or duplicate checks. Report only a confirmed reusable Harness gap with the bounded Reporter; no model call is needed for transport. Replace obsolete instructions/checks when a stronger existing mechanism covers the same invariant; retain independent safeguards and regression tests.
 
-Central evolution is off until explicitly enabled; at most one report per scheduled run (two per week), Luna Low, ten-minute timeout, no automatic retry or premium escalation. It uses a separate API budget; routine application tasks do not trigger model calls for feedback.
+Issues accumulate without a model call for reporting. Analyze accumulated reports only when the owner requests maintenance in the existing local OpenCode session, Luna Medium by default. No separate API budget, scheduled agents, automatic retry or premium escalation.
