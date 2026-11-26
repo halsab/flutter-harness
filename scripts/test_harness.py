@@ -82,6 +82,24 @@ class Lifecycle(unittest.TestCase):
         h.begin(self.root,self.c,"feature/next")
         self.assertEqual(h.read_json(h.work(self.root)/"task.json"),current)
 
+    def test_resume_existing_branch_after_integration_advanced_uses_fresh_evidence(self):
+        old_base=self.git("rev-parse","origin/trunk")
+        self.write("lib/main.dart","parked change")
+        h.checkpoint_local(self.root,self.c,"feat: parked")
+        parked=self.git("rev-parse","HEAD")
+        self.write(".flutter-harness/work/check.json",'{"status":"PASS"}')
+        self.git("switch","trunk")
+        self.write("docs/new.md","integration advanced")
+        self.git("add","docs/new.md")
+        self.git("commit","-m","advance integration")
+        self.git("push","origin","trunk")
+        h.begin(self.root,self.c,"feature/test",resume=True)
+        task=h.read_json(h.work(self.root)/"task.json")
+        self.assertEqual(self.git("rev-parse","HEAD"),parked)
+        self.assertEqual(task["base_head"],old_base)
+        self.assertTrue(task["resumed"])
+        self.assertFalse((h.work(self.root)/"check.json").exists())
+
     def test_diagnostics_uses_latest_task_in_same_session(self):
         for task in ("first","second"):
             h.event(self.root,"task-start",session="same",task=task)
@@ -232,6 +250,19 @@ class Lifecycle(unittest.TestCase):
         h.atomic_json(h.work(self.root)/"delivery.json",m)
         with self.assertRaisesRegex(h.Blocked,"Invalid required_e2e"):
             h.delivery_manifest(self.root,self.c)
+
+    def test_explicit_verification_plan_correction_before_publication(self):
+        self.write("lib/main.dart","new")
+        a=h.argparse.Namespace(message="change",title="Change",body="Verified",review=False,visual=True,interaction=False,e2e=[])
+        h.prepare_delivery(self.root,self.c,a)
+        a.visual=False
+        h.prepare_delivery(self.root,self.c,a)
+        self.assertTrue(h.delivery_manifest(self.root,self.c)["visual_required"])
+        a.revise_verification="Only a statically verifiable style correction"
+        h.prepare_delivery(self.root,self.c,a)
+        manifest=h.delivery_manifest(self.root,self.c)
+        self.assertFalse(manifest["visual_required"])
+        self.assertEqual(manifest["verification_revision_reason"],a.revise_verification)
 
     def test_runtime_selection_stops_and_pins_successful_fallback(self):
         with patch.object(h,"runtime_targets",return_value=[("ios","phone"),("android","emu"),("web",None)]) as discovery, \
