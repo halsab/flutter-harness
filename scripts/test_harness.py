@@ -145,12 +145,11 @@ class Lifecycle(unittest.TestCase):
         h.begin(self.root,self.c,"feature/test")
         self.assertEqual(path.read_bytes(),before)
 
-    def test_changed_candidate_requires_check_before_runtime(self):
+    def test_changed_candidate_can_launch_without_intermediate_check(self):
         self.write("lib/main.dart","changed")
-        with patch.object(h,"probe_runtime") as probe:
-            with self.assertRaisesRegex(h.Blocked,"canonical check"):
-                h.launch_auto(self.root,self.c)
-            probe.assert_not_called()
+        with patch.object(h,"runtime_targets",return_value=[("ios","phone")]),patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch",return_value={"status":"READY","platform":"ios","target":"phone"}) as launch:
+            h.launch_auto(self.root,self.c)
+            launch.assert_called_once()
 
     def test_pinned_unchanged_runtime_reuses_prior_launch(self):
         h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
@@ -204,8 +203,8 @@ class Lifecycle(unittest.TestCase):
         h.atomic_json(h.work(self.root)/"check.json",{"status":"PASS","digest":digest})
         h.atomic_json(h.work(self.root)/"runtime.json",{"platform":"ios","device":"phone","digest":digest})
         h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
-        plan={"platform":"ios","fixture":"isolated test data","scenarios":[{"label":"main","kind":"screen","scenario":"maestro/screen.yaml"},
-                {"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml"}]}
+        plan={"platform":"ios","fixture":"isolated test data","scenarios":[{"label":"main","kind":"screen","scenario":"maestro/screen.yaml","themes":["light","dark"]},
+                {"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml","themes":["light","dark"]}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json",plan)
         with patch.object(h,"capture") as cap,patch.object(h,"visual_evidence") as evidence:
             h.capture_plan(self.root,self.c)
@@ -452,7 +451,7 @@ class Lifecycle(unittest.TestCase):
         folder = h.visual_folder(self.root,"android",digest)
         folder.mkdir(parents=True)
         scope = h.visual_scope(self.root,"android")
-        plan = {"platform":"android","fixture":"mixed short/long realistic records","scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml"}]}
+        plan = {"platform":"android","fixture":"mixed short/long realistic records","scenarios":[{"label":"final","kind":"screen","themes":["light","dark"]},{"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml","themes":["light","dark"]}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json", plan)
         h.atomic_json(h.work(self.root)/"visual-preflight.json", {"status":"PASS","branch":"feature/test","ready":[{"platform":"android","device":"emulator"}]})
         def write(label, theme, suffix):
@@ -465,6 +464,18 @@ class Lifecycle(unittest.TestCase):
                 "scenario_sha256":hashlib.sha256((self.root/"maestro/menu.yaml").read_bytes()).hexdigest() if label=="menu" else None,
                 "sha256":hashlib.sha256(data).hexdigest()})
         return folder, write
+
+    def test_single_theme_final_screen_without_script(self):
+        self.write("lib/main.dart","new candidate")
+        _,write=self.visual_fixture()
+        path=h.work(self.root)/"visual-plan.json"
+        plan=h.read_json(path)
+        plan["scenarios"]=[{"label":"final","kind":"screen"}]
+        h.atomic_json(path,plan)
+        write("final","light",b"light")
+        result=h.visual_evidence(self.root)
+        self.assertEqual(len(result["captures"]),1)
+        self.assertEqual(result["captures"][0]["theme"],"light")
 
     def test_visual_accepts_no_baseline(self):
         self.write("lib/main.dart","new candidate")
@@ -532,28 +543,24 @@ class Lifecycle(unittest.TestCase):
         with patch.object(h,"origin_repo",return_value="owner/repo"),patch.object(h,"canonical_repo",return_value=("owner/repo","1")),patch.object(h,"pr_list",side_effect=[None,pr]),patch.object(h,"remote_call",side_effect=lambda op,fn,*args,**kwargs: fn(*args,**kwargs) if op=="PR_LIST" else None) as remote:
             h.save_draft(self.root,self.c)
             self.assertIn("--draft",next(c.args for c in remote.call_args_list if c.args[0]=="PR_CREATE"))
-        self.assertEqual(h.read_json(h.work(self.root)/"draft-result.json")["status"],"DRAFT_SAVED")
+        self.assertEqual(h.draft_completion(self.root,self.c)["status"],"DRAFT_SAVED")
         self.assertFalse((h.work(self.root)/"delivery-result.json").exists())
         with patch.object(h,"origin_repo",return_value="owner/repo"),patch.object(h,"canonical_repo",return_value=("owner/repo","1")),patch.object(h,"pr_list",return_value={**pr,"isDraft":False}):
             with self.assertRaisesRegex(h.Blocked,"ready"):
                 h.save_draft(self.root,self.c)
 
-    def test_large_uncommitted_slice_allows_impact_check_but_stops_expensive_runtime(self):
+    def test_large_uncommitted_slice_does_not_force_checkpoint_before_runtime(self):
         self.write("lib/large.dart","// generated\n"*401)
-        with patch.object(h,"check_candidate") as check:
-            h.check(self.root,self.c)
-            check.assert_called_once()
-        with patch.object(h,"probe_runtime") as probe:
-            with self.assertRaisesRegex(h.Blocked,"checkpoint before expensive verification"):
-                h.launch_auto(self.root,self.c)
-            probe.assert_not_called()
-        h.checkpoint_local(self.root,self.c,"feat: save coherent slice")
-        with patch.object(h,"check_candidate") as check:
-            h.check(self.root,self.c)
-            check.assert_called_once()
-        self.write("lib/large.dart","// changed\n"*401)
-        with self.assertRaisesRegex(h.Blocked,"Large uncommitted task slice"):
-            h.require_checkpoint(self.root,self.c)
+        with patch.object(h,"runtime_targets",return_value=[("ios","phone")]),patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch",return_value={"status":"READY","platform":"ios","target":"phone"}) as launch:
+            h.launch_auto(self.root,self.c)
+            launch.assert_called_once()
+        self.assertTrue(h.dirty(self.root))
+
+    def test_checkpoint_can_save_work_after_blocked_delivery(self):
+        self.write("lib/main.dart","new candidate")
+        h.atomic_json(h.work(self.root)/"delivery-state.json",{"status":"BLOCKED","digest":"old"})
+        h.checkpoint_local(self.root,self.c,"fix: preserve")
+        self.assertFalse(h.dirty(self.root))
 
     def test_failed_scope_keeps_last_success_and_retry_selects_changed_test(self):
         self.write(".gitignore","/.flutter-harness/work/\n/.flutter-harness/previews/\n/.dart_tool/\n")
