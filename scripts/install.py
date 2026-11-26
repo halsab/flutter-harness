@@ -11,7 +11,7 @@ import sys
 SOURCE = Path(__file__).resolve().parents[1]
 START = "<!-- flutter-harness:start -->"
 END = "<!-- flutter-harness:end -->"
-BINS = ("harness.py","check.sh","check-runner.py","check-product.py","init-product.py","maestro.sh",
+BINS = ("harness.py","check.sh","check-runner.py","check_scope.py","check-product.py","init-product.py","maestro.sh",
         "session-usage.py","validate-opencode.py","web-preview.py","reporter.py")
 IGNORES = ("/.flutter-harness/work/", "/.flutter-harness/previews/", "/.playwright/", ".DS_Store")
 # Known retired managed paths, never arbitrary project files.

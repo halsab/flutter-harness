@@ -57,7 +57,7 @@ require explicit product-standard migration; sync does not rewrite them.
 Use `mobile` for Android/iOS only, or `mobile-web` to include Web. Replace
 `main` with the actual integration branch. Open OpenCode in the project
 directory, select Build / Luna Medium and give one product task. The agent
-handles branch, coherent local checkpoint commits, scoped checks, relevant review and PR creation; you approve
+handles branch, coherent local checkpoint commits, deterministic impact checks, relevant review and PR creation; you approve
 publication and merge. Ordinary UI interaction is automated with project-local Maestro/Playwright scenarios, not manual requests to the owner. No initial screenshot unless comparison is needed.
 
 ### Agent scope
@@ -118,3 +118,7 @@ There is no need to analyze each Issue manually.
 ### Blocked task recovery
 
 A Build agent saves local checkpoints without publication. If review is genuinely exhausted and you explicitly authorize another review, ask Build to use canonical `review-recovery` (one permission-gated extension for current evidence). If work is still incomplete and you want it backed up remotely, explicitly authorize `save-draft` in Build. It requires clean local commits and creates/updates a Draft PR, never a completed delivery receipt. The same task remains active until canonical `deliver` passes all gates. Never merge a draft or bypass acceptance.
+
+### Local checks versus CI
+
+`python3 .flutter-harness/bin/harness.py check` selects unit/widget tests from changed Dart files and their transitive import/export/part dependents. It compares each slice with the last successful candidate (first slice: task base), formats only changed Dart files, avoids unnecessary dependency resolution and records explicit skipped steps. Dependency/global/uncertain changes can expand to the full suite with a recorded reason. A local PASS is an exact candidate-bound impact receipt, not a claim that every test ran. The generated PR CI still executes the complete standard suite. Native and integration/E2E checks are separate and only required for relevant risks. Run the canonical check before each coherent checkpoint; no routine full local final run.

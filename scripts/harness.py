@@ -20,6 +20,7 @@ import time
 # Installed modules must not create untracked artifacts or alter the candidate.
 sys.dont_write_bytecode = True
 import reporter
+import check_scope
 
 HERE = Path(__file__).resolve().parent
 PNG = b"\x89PNG\r\n\x1a\n"
@@ -290,7 +291,7 @@ def begin(root, c, name):
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
     if current != name or task.get("branch") != name:
-        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","draft-result.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","draft-result.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","check-progress.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
             (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
@@ -405,7 +406,12 @@ def current_check(root,digest):
         if not receipt.is_file():
             return False
         value=read_json(receipt)
-        return value.get("status")=="PASS" and value.get("digest")==digest
+        return check_matches(root,value,digest)
+
+
+def check_matches(root, value, digest):
+    return (value.get("status") == "PASS" and value.get("digest") == digest and
+            ("environment" not in value or value["environment"] == check_scope.environment(root)))
 
 
 def check(root, c):
@@ -417,14 +423,13 @@ def check(root, c):
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:
             raise Blocked("Standard check already running; inspect check-attempt.json")
-        require_checkpoint(root,c)
         receipt_path = folder / "check.json"
         if receipt_path.is_file():
             prior = read_json(receipt_path)
             digest = fingerprint(root)
-            if prior.get("status") == "PASS" and prior.get("digest") == digest:
+            if check_matches(root,prior,digest):
                 event(root, "check-reused", digest=digest)
-                output(status="PASS", digest=digest, reused=True, receipt=str(receipt_path))
+                output(status="PASS", digest=digest, reused=True, scope=prior.get("scope"), receipt=str(receipt_path))
                 return
         attempt = {"status":"RUNNING","branch":text(git(root,"branch","--show-current")),
                    "revision":c["revision"],"started_at":int(time.time()*1000),"pid":os.getpid()}
@@ -446,19 +451,37 @@ def check_candidate(root,c,attempt):
     receipt.unlink(missing_ok=True)
     event(root, "check-start")
     require((root / ".flutter-harness/product.json").is_file(), "Missing product policy configuration")
-    logs = Path(tempfile.mkdtemp(prefix="prepare-", dir=work(root)))
-    run(root, "flutter", "pub", "get", log=logs / "pub-get.log",timeout=120)
-    run(root, "dart", "format", "lib", "test", log=logs / "format.log",timeout=60)
+    task_path = work(root) / "task.json"
+    task = read_json(task_path) if task_path.is_file() else None
+    if task:
+        require(task.get("branch") == text(git(root,"branch","--show-current"))
+                and task.get("revision") == c["revision"], "Stale task; run canonical begin")
+        require(text(git(root,"merge-base",task["base_head"],"HEAD")) == task["base_head"],
+                "Task baseline is not an ancestor")
+    progress_path = work(root) / "check-progress.json"
+    prior = read_json(progress_path) if progress_path.is_file() else None
+    initial, _ = check_scope.plan(root, task, prior)
+    if initial["pub_get"] or initial["format"]:
+        logs = Path(tempfile.mkdtemp(prefix="prepare-", dir=work(root)))
+        if initial["pub_get"]:
+            run(root, "flutter", "pub", "get", log=logs / "pub-get.log",timeout=120)
+        if initial["format"]:
+            run(root, "dart", "format", *initial["format"], log=logs / "format.log",timeout=60)
     before = fingerprint(root)
+    scope, progress = check_scope.plan(root, task, prior)
+    scope["pub_get"] = initial["pub_get"]
+    print("Local impact scope: " + json.dumps(scope, ensure_ascii=False), flush=True)
     # Unique artifact directory prevents collisions between runs/checkouts.
     artifact_dir = Path(tempfile.mkdtemp(prefix="standard-", dir=work(root)))
+    scope_path = artifact_dir / "scope.json"
+    atomic_json(scope_path,scope)
     environment = dict(os.environ, HARNESS_ARTIFACTS_DIR=str(artifact_dir))
-    attempt.update(digest=before,artifacts=str(artifact_dir.relative_to(root)))
+    attempt.update(digest=before,artifacts=str(artifact_dir.relative_to(root)),scope=scope)
     atomic_json(work(root)/"check-attempt.json",attempt)
     event(root, "check-run", artifacts=str(artifact_dir.relative_to(root)))
     # Keep short runner stdout visible for the OpenCode quality hook.
     try:
-        run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"], env=environment, timeout=2400)
+        run(root, "bash", str(HERE / "check.sh"), ".", "standard", c["profile"], "--scope", str(scope_path), env=environment, timeout=2400)
     except (Blocked,subprocess.TimeoutExpired):
         reports=list(artifact_dir.glob("check-*.tsv"))
         if len(reports)==1:
@@ -466,7 +489,7 @@ def check_candidate(root,c,attempt):
                 rows=list(csv.DictReader(stream,delimiter="\t"))
             attempt["checks"]=rows
             attempt["report"]=str(reports[0].relative_to(root))
-            failures=[r for r in rows if r.get("status")!="PASS"]
+            failures=[r for r in rows if r.get("status") not in ("PASS","SKIP")]
             if failures:
                 event(root,"check-failed",check=failures[-1]["check"],status=failures[-1]["status"],exit=failures[-1]["exit_code"],report=attempt["report"])
         raise
@@ -475,14 +498,22 @@ def check_candidate(root,c,attempt):
     require(len(reports) == 1, "Missing unique runner report")
     with reports[0].open() as f:
         checks = list(csv.DictReader(f, delimiter="\t"))
-    require({r.get("check") for r in checks if r.get("status")=="PASS"} ==
-            {"format","product","analyze","flutter-tests"}, "Incomplete standard runner evidence")
+    expected = {"format":bool(scope["format"]), "product":scope["product"],
+                "analyze":scope["analyze"], "flutter-tests":scope["mode"]!="none"}
+    require(len(checks)==len(expected) and
+            {r.get("check"): (r.get("status"),r.get("exit_code")) for r in checks} ==
+            {k: ("PASS" if enabled else "SKIP","0") for k,enabled in expected.items()},
+            "Incomplete local impact runner evidence")
+    require(check_scope.environment(root)==progress["environment"],
+            "SDK/package environment changed during verification")
     attempt["checks"]=checks
     attempt["report"]=str(reports[0].relative_to(root))
+    atomic_json(progress_path, progress)
     atomic_json(receipt, {"digest": before, "status": "PASS", "checks":checks,
+                          "scope":scope, "environment":progress["environment"],
                           "report":str(reports[0]), "checked_at": int(time.time())})
     event(root, "check-pass", digest=before)
-    output(status="PASS", digest=before, receipt=str(receipt))
+    output(status="PASS", digest=before, scope=scope, receipt=str(receipt))
 
 
 def origin_repo(root):
@@ -639,6 +670,7 @@ def delivery_manifest(root,c):
 
 def prepare_delivery(root,c,a):
     name = branch(root,c["integration_branch"])
+    require_checkpoint(root,c)
     files = dirty(root)
     path = work(root)/"delivery.json"
     if (work(root)/"delivery-state.json").is_file() and not files:
@@ -807,7 +839,10 @@ def _deliver(root, c, state):
     identity["head"] = head
     checkpoint("delivery-committed", head=head)
     body = work(root) / "pr-body.md"
-    summary = ["", "", "## Harness evidence (generated)", f"- Harness revision: {c['revision']}", f"- Candidate: {digest}", "- Standard check: PASS"]
+    scope = receipt.get("scope", {})
+    summary = ["", "", "## Harness evidence (generated)", f"- Harness revision: {c['revision']}", f"- Candidate: {digest}",
+               f"- Local impact check: PASS ({scope.get('mode','legacy')} unit/widget scope; {scope.get('reason','standard receipt')})",
+               "- Full suite: project PR CI (not asserted by local impact receipt)"]
     if visual:
         summary.append(f"- Visual evidence: {visual['evidence_digest']}")
     for platform in required_e2e:

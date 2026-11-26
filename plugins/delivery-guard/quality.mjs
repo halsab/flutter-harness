@@ -328,14 +328,25 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     if (call.kind === "check") {
       const output = textOf(event.result?.content);
       const exit = event.result?.metadata?.exit;
-      if (exit === 0 && /PASS format/.test(output) && /PASS analyze/.test(output) && /PASS flutter-tests/.test(output) && (!call.product || /PASS product/.test(output))) {
+      const passed = exit === 0 && (verifyCheck ? await verifyCheck() : /PASS format/.test(output) && /PASS analyze/.test(output) && /PASS flutter-tests/.test(output) && (!call.product || /PASS product/.test(output)));
+      if (passed) {
         const current = await view(id);
         if (current?.task.id !== task.id) return;
         // CLI formats/resolves dependencies before fingerprinting and checks that
         // inputs did not change during tests. Bind evidence to the resulting tree.
         await ctx.storage.set(key(id,task), { ...state, passedDigest: current.change.digest, lastCheckFailed: false });
       } else if (/(?:FAIL|TIMEOUT|INTERRUPTED) flutter-tests/.test(output)) {
-        await ctx.storage.set(key(id,task), { ...state, passedDigest: null, lastCheckFailed: true, failedNames: unique([...(state.failedNames || []), ...call.names]) });
+        let names = call.names;
+        if (verifyCheck) {
+          try {
+            const attempt = JSON.parse(await readFile(join(root,".flutter-harness/work/check-attempt.json"),"utf8"));
+            if (attempt.scope?.mode === "selected") {
+              const selected = new Set(attempt.scope.tests);
+              names = names.filter(n => selected.has(n.split(": ")[0]));
+            }
+          } catch { /* retain conservative failure protection */ }
+        }
+        await ctx.storage.set(key(id,task), { ...state, passedDigest: null, lastCheckFailed: true, failedNames: unique([...(state.failedNames || []), ...names]) });
       } else {
         await ctx.storage.set(key(id,task), { ...state, passedDigest: null, lastCheckFailed: true });
       }

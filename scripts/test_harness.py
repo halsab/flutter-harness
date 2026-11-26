@@ -518,12 +518,11 @@ class Lifecycle(unittest.TestCase):
             with self.assertRaisesRegex(h.Blocked,"ready"):
                 h.save_draft(self.root,self.c)
 
-    def test_large_uncommitted_slice_stops_expensive_check_and_runtime(self):
+    def test_large_uncommitted_slice_allows_impact_check_but_stops_expensive_runtime(self):
         self.write("lib/large.dart","// generated\n"*401)
         with patch.object(h,"check_candidate") as check:
-            with self.assertRaisesRegex(h.Blocked,"checkpoint before expensive verification"):
-                h.check(self.root,self.c)
-            check.assert_not_called()
+            h.check(self.root,self.c)
+            check.assert_called_once()
         with patch.object(h,"probe_runtime") as probe:
             with self.assertRaisesRegex(h.Blocked,"checkpoint before expensive verification"):
                 h.launch_auto(self.root,self.c)
