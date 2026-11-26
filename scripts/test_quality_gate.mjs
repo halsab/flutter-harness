@@ -13,8 +13,9 @@ test("risk detection follows actual repository changes, not routine UI wording",
   assert.equal(classify(["lib/features/tasks/task_list_screen.dart"], "Измени подпись").length, 0);
   assert.ok(classify(["test/widget_test.dart"], "", ["test/widget_test.dart: preserves records"]).length);
 });
-test("shared product UI and explicit redesign require review even at small sizes", () => {
-  assert.ok(classify(["lib/design_system/theme.dart"],"change palette").length);
+test("routine shared styles are not visual gates; explicit redesign requires code review", () => {
+  assert.equal(classify(["lib/design_system/theme.dart"],"change loader color").length,0);
+  assert.equal(classify(["lib/app/home_screen.dart"],"Измени размер кнопки").length,0);
   assert.ok(classify(["lib/features/tasks/screens/tasks.dart"],"редизайн UI/UX").length);
   assert.equal(classify(["lib/features/tasks/screens/tasks.dart"],"fix typo").length,0);
   // PR #30 used natural Russian wording rather than the keyword "редизайн".
@@ -30,9 +31,9 @@ test("shared product UI and explicit redesign require review even at small sizes
 test("review effort scales with diff size and risk, not the builder's choice", () => {
   assert.equal(reviewEffort({files:1,lines:20}),"medium");
   assert.equal(reviewEffort({files:3,lines:100}),"medium");
-  assert.equal(reviewEffort({files:3,lines:101}),"high");
-  assert.equal(reviewEffort({files:4,lines:20}),"high");
-  assert.equal(reviewEffort({files:8,lines:400}),"high");
+  assert.equal(reviewEffort({files:3,lines:101}),"medium");
+  assert.equal(reviewEffort({files:4,lines:20}),"medium");
+  assert.equal(reviewEffort({files:8,lines:400}),"medium");
   assert.equal(reviewEffort({files:1,lines:401}),"high");
   assert.equal(reviewEffort({files:9,lines:20}),"high");
   assert.equal(reviewEffort({files:1,lines:8},["destructive operation"]),"high");
@@ -187,49 +188,33 @@ test("changing a behavior contract invalidates evidence without inflating source
   assert.deepEqual(after.size,before.size);
 });
 
-test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
-  const {root,git}=await fixture(t);
-  await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
-  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// visual change\n");
+test("redesign uses source review without a mandatory screenshot matrix", async t => {
+  const {root}=await fixture(t);
   const values=new Map([["task/main",{active:true,id:"first",request:"Переработай интерфейс приложения"}]]);
   const hooks={};
-  let verdict="VERDICT: PASS", visualReady=false, visualDigest="one";
+  let visualCalls=0;
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
-    tool:{hook:async(n,f)=>hooks[n]=f},
-    permission:{hook:async(n,f)=>hooks[n]=f},
-    session:{
-      get:async()=>({parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}}),
-      context:async()=>[{type:"assistant",content:[{type:"text",text:verdict}]}],
-    },
+    tool:{hook:async(n,f)=>hooks[n]=f},permission:{hook:async(n,f)=>hooks[n]=f},
+    session:{get:async()=>({parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}}),
+      context:async()=>[{type:"assistant",content:"VERDICT: PASS"}]},
   };
-  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{
-    if(!visualReady)throw Error("missing interaction");
-    return {evidence_digest:visualDigest,captures:[{path:"final.png"}]};
-  });
-  const check={tool:"shell",sessionID:"main",id:"check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id,async()=>{visualCalls++;throw Error("unexpected screenshot");});
+  const check={tool:"shell",sessionID:"main",id:"c",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
   await hooks["execute.before"](check);
   await hooks["execute.after"]({...check,status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}});
-  const review={tool:"subagent",sessionID:"main",id:"review",input:{agent:"reviewer",prompt:"Review"}};
-  await assert.rejects(hooks["execute.before"](review),/missing interaction/);
-  assert.match(await q.reason("main"),/runtime evidence/);
-  visualReady=true;
+  const review={tool:"subagent",sessionID:"main",id:"r",input:{agent:"reviewer"}};
   await hooks["execute.before"](review);
-  assert.match(review.input.prompt,/VISUAL: PASS/);
+  assert.match(review.input.prompt,/Source-first/);
   await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"child"}}});
-  assert.match(await q.reason("main"),/reviewer verdict/);
-  verdict="VISUAL: PASS\nVERDICT: PASS";
   assert.equal(await q.reason("main"),"");
-  visualDigest="two";
-  assert.match(await q.reason("main"),/reviewer verdict/);
-  visualDigest="one";
-  git("add","."); git("commit","-qm","visual change");
-  assert.equal(await q.reason("main"),"");
-  await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// changed again\n");
+  assert.equal(visualCalls,0);
+  await writeFile(join(root,"lib/data/task_repository.dart"),"void changed() {}\n");
   assert.match(await q.reason("main"),/standard check/);
+  assert.equal(visualCalls,0);
 });
 
-test("combined production hooks reserve no reviewer before evidence and bind actual approval",async t=>{
+test("combined production hooks review source before final explicit visual evidence",async t=>{
   const {root}=await fixture(t);
   // This fixture normally modifies a destructive repository; restore it to
   // exercise a genuinely focused visual-only diff, not a High-risk change.
@@ -264,25 +249,24 @@ test("combined production hooks reserve no reviewer before evidence and bind act
   await assert.rejects(emit("execute.before",review),/invalid required_e2e/);
   assert.match(await quality.reason("main"),/Prepare valid delivery manifest/);
   manifestReady=true;
-  await assert.rejects(emit("execute.before",review),/missing menu/);
-  assert.equal(await resources.status("main"),"");
-  assert.deepEqual(await resources.sessions("main"),["main"]);
-  ready=true; await emit("execute.before",review);
-  assert.match(review.input.prompt,/menu.png/);
+  await emit("execute.before",review);
+  assert.match(review.input.prompt,/Source-first/);
   assert.equal(review.input.model,"openai/gpt-6-luna#medium");
   children.set("child",{parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}});
   await emit("execute.after",{...review,status:"completed",result:{metadata:{sessionID:"child"}}});
+  assert.match(await quality.reason("main"),/missing menu/);
+  ready=true;
   assert.equal(await quality.reason("main"),"");
   currentReceipt=false;
   assert.match(await quality.reason("main"),/receipt absent or stale/);
   currentReceipt=true;
   visualDigest="two";
-  assert.match(await quality.reason("main"),/reviewer verdict/);
+  assert.equal(await quality.reason("main"),"", "new visual evidence does not invalidate source review");
 });
 
-test("focused visual review uses Medium but structural and broad work remains High",()=>{
+test("focused visual review stays Medium; critical persistence remains High",()=>{
   assert.equal(reviewEffort({files:2,lines:110},["material UI redesign or design-system change"]),"medium");
-  assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"high");
+  assert.equal(reviewEffort({files:2,lines:201},["material UI redesign or design-system change"]),"medium");
   assert.equal(reviewEffort({files:1,lines:20},["persistent data, storage or sensitive operation changed"]),"high");
 });
 

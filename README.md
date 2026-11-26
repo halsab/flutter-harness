@@ -57,8 +57,7 @@ require explicit product-standard migration; sync does not rewrite them.
 Use `mobile` for Android/iOS only, or `mobile-web` to include Web. Replace
 `main` with the actual integration branch. Open OpenCode in the project
 directory, select Build / Luna Medium and give one product task. The agent
-handles branch, coherent local checkpoint commits, deterministic impact checks, relevant review and PR creation; you approve
-publication and merge. Ordinary UI interaction is automated with project-local Maestro/Playwright scenarios, not manual requests to the owner. No initial screenshot unless comparison is needed.
+handles branching, implementation, focused impact checks, source-first review and PR creation; you approve publication and merge. Ordinary text/style/size fixes need no simulator, screenshots or Maestro/Playwright. For material UI inspect the affected final runtime only when cheaper evidence is insufficient. Automated scenarios are reserved for actual risk or explicit requirements.
 
 ### Agent scope
 
@@ -121,7 +120,7 @@ A Build agent saves local checkpoints without publication. If review is genuinel
 
 ### Local checks versus CI
 
-`python3 .flutter-harness/bin/harness.py check` selects unit/widget tests from changed Dart files and their transitive import/export/part dependents. It compares each slice with the last successful candidate (first slice: task base), formats only changed Dart files, avoids unnecessary dependency resolution and records explicit skipped steps. Dependency/global/uncertain changes can expand to the full suite with a recorded reason. A local PASS is an exact candidate-bound impact receipt, not a claim that every test ran. The generated PR CI still executes the complete standard suite. Native and integration/E2E checks are separate and only required for relevant risks. Run the canonical check before each coherent checkpoint; no routine full local final run.
+`python3 .flutter-harness/bin/harness.py check` selects unit/widget tests from changed Dart files and their transitive import/export/part dependents. It compares each slice with the last successful candidate (first slice: task base), formats only changed Dart files, avoids unnecessary dependency resolution and records explicit skipped steps. Dependency/global/uncertain changes can expand to the full suite with a recorded reason. A local PASS is an exact candidate-bound impact receipt, not a claim that every test ran. The generated PR CI still executes the complete standard suite. Native and integration/E2E checks are separate and only required for relevant risks. Run the canonical check after implementation and only after meaningful affected fixes; checkpoint coherent work without requiring a check. No routine full local final run.
 
 ### Fast CI for Harness itself
 
