@@ -178,7 +178,7 @@ export function taskLifecycle(ctx, deps) {
         if (state.finalReminder) return;
         const hasWork=state.begun && (result.current.digest!==state.baseline.digest || result.current.head!==state.baseline.head || !!result.current.status);
         await set(id,{...state,finalReminder:true});
-        const preserve=hasWork && !result.deliveryError
+        const preserve=hasWork && (!result.deliveryError || (result.deliveryError.code==="DELIVERY_INVARIANT" && result.deliveryError.stage==="delivery-started"))
           ? "Stop verification now. Checkpoint coherent work if dirty and offer canonical save-draft with owner approval; report DRAFT_SAVED only after the actual verified receipt, never DONE."
           : "Stop verification now. Preserve work and report INCOMPLETE, the exact blocker and the next owner action. Do not retry or bypass an identity/permission error.";
         return "[Flutter Harness final recovery] "+next.reason+". "+preserve;

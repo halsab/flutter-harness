@@ -286,7 +286,7 @@ test("verified draft parks without PASS and permits a new task",async()=>{
   const task=()=>values.get("task/root");
   await prompt();const old=task().id;
   await life.authorizeDraft({sessionID:"root",id:"draft"},task());
-  draft={status:"DRAFT_SAVED",...snap,saved_at:Date.now()};
+  draft={...snap,status:"DRAFT_SAVED",saved_at:Date.now()};
   await life.delivered({tool:"shell",sessionID:"root",id:"draft",status:"completed",result:{metadata:{exit:0}}});
   assert.equal(task().active,false);
   assert.equal(task().outcome,"DRAFT_SAVED");

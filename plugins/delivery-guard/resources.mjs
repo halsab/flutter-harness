@@ -20,7 +20,9 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
   async function running(id, state) {
     const active = [];
     for (const c of state.children || []) {
-      const session = await ctx.session.get({ sessionID:c.id });
+      let session;
+      try { session = await ctx.session.get({ sessionID:c.id }); } catch { active.push({...c,unavailable:true}); continue; }
+      if (!session?.parentID) { active.push({...c,unavailable:true}); continue; }
       if (session.parentID !== id) throw Error("Unexpected child session ownership");
       if (!["succeeded","failed","canceled","cancelled","aborted"].includes(session.outcome)) active.push(c);
     }
@@ -30,7 +32,9 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     return locked(id, async()=>{
       const state = await read(id);
       if ((state.pending || []).length) return "A child dispatch has not returned its actual session ID/outcome.";
-      if ((await running(id,state)).length) return "Wait for actual child session completion before delivery.";
+      const active=await running(id,state);
+      if (active.some(c=>c.unavailable)) return "A child dispatch cannot be reconciled; preserve work or park a draft.";
+      if (active.length) return "Wait for actual child session completion before delivery.";
       return "";
     });
   }

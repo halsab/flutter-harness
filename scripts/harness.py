@@ -312,12 +312,12 @@ def begin(root, c, name, *, resume=False):
             git(root, "switch", name)
         else:
             git(root, "switch", "-c", name, "origin/" + base)
-    if resume or current != name or task.get("branch") != name:
-        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","draft-result.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","check-progress.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
-            (work(root)/filename).unlink(missing_ok=True)
     actual_base = text(git(root, "merge-base", "HEAD", "origin/" + base))
     require(resume or actual_base == base_head, "Feature branch does not contain current integration base")
     installed_revision(root,c)
+    if resume or current != name or task.get("branch") != name:
+        for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","draft-result.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","check-progress.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
+            (work(root)/filename).unlink(missing_ok=True)
     atomic_json(task_path,{"branch":name,"base_head":actual_base,"revision":c["revision"],"baseline_digest":fingerprint(root),"started_at":int(time.time()*1000),"resumed":resume})
     event(root, "begin", branch=name, base=base)
     output(status="PASS", branch=name, base=base)
@@ -419,15 +419,28 @@ def check(root, c):
                 event(root, "check-reused", digest=digest)
                 output(status="PASS", digest=digest, reused=True, scope=prior.get("scope"), receipt=str(receipt_path))
                 return
+        path = folder/"check-attempt.json"
+        previous_attempt = read_json(path) if path.is_file() else {}
+        identity = {"digest":fingerprint(root),"environment":check_scope.environment(root)}
+        repeated = (previous_attempt.get("status") == "FAIL" and
+                    previous_attempt.get("failure_identity") == identity)
+        consecutive = previous_attempt.get("consecutive_failures",1) if repeated else 0
+        require(consecutive < 2,
+                "Same candidate and SDK/package environment failed twice; inspect check-attempt.json, repair the cause or preserve a draft. Do not repeat unchanged check.")
         attempt = {"status":"RUNNING","branch":text(git(root,"branch","--show-current")),
                    "revision":c["revision"],"started_at":int(time.time()*1000),"pid":os.getpid()}
-        path = folder/"check-attempt.json"
         atomic_json(path,attempt)
         try:
             check_candidate(root,c,attempt)
         except BaseException as exc:
             attempt.update(status="INTERRUPTED" if isinstance(exc,(KeyboardInterrupt,SystemExit)) else "FAIL",
                            error_type=type(exc).__name__,finished_at=int(time.time()*1000))
+            try:
+                failure_identity={"digest":fingerprint(root),"environment":check_scope.environment(root)}
+                attempt.update(failure_identity=failure_identity,
+                               consecutive_failures=consecutive+1 if failure_identity==identity else 1)
+            except (OSError,ValueError,Blocked,subprocess.TimeoutExpired):
+                pass
             atomic_json(path,attempt)
             raise
         attempt.update(status="PASS",finished_at=int(time.time()*1000))
@@ -685,6 +698,7 @@ def prepare_delivery(root,c,a):
     revision_reason = getattr(a, "revise_verification", None)
     if revision_reason is not None:
         require(revision_reason.strip(), "Explain why the selected verification plan was mistaken")
+        manifest["verification_revision_reason"] = revision_reason.strip()[:500]
         event(root, "verification-plan-revised")
     else:
         for k in ("review_required","visual_required","visual_interaction"):
@@ -857,6 +871,8 @@ def _deliver(root, c, state):
     summary = ["", "", "## Harness evidence (generated)", f"- Harness revision: {c['revision']}", f"- Candidate: {digest}",
                f"- Local impact check: PASS ({scope.get('mode','legacy')} unit/widget scope; {scope.get('reason','standard receipt')})",
                "- Full suite: project PR CI (not asserted by local impact receipt)"]
+    if manifest.get("verification_revision_reason"):
+        summary.append("- Verification plan revised: " + " ".join(manifest["verification_revision_reason"].split()))
     if visual:
         summary.append(f"- Visual evidence: {visual['evidence_digest']}")
     for platform in required_e2e:

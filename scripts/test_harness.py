@@ -611,6 +611,20 @@ class Lifecycle(unittest.TestCase):
             h.check(self.root,self.c)
             self.assertEqual(len(invocations),count)
 
+    def test_repeated_unchanged_failed_check_stops_without_another_runner(self):
+        self.write("lib/main.dart","changed")
+        with patch.object(h,"check_candidate",side_effect=h.Blocked("test failure")) as runner:
+            for _ in range(2):
+                with self.assertRaisesRegex(h.Blocked,"test failure"):
+                    h.check(self.root,self.c)
+            with self.assertRaisesRegex(h.Blocked,"failed twice"):
+                h.check(self.root,self.c)
+            self.assertEqual(runner.call_count,2)
+            self.write("lib/main.dart","fixed")
+            with self.assertRaisesRegex(h.Blocked,"test failure"):
+                h.check(self.root,self.c)
+            self.assertEqual(runner.call_count,3)
+
     def test_identical_successful_check_reused(self):
         self.write("lib/main.dart","verified")
         self.receipt(["lib/main.dart"])
