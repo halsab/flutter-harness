@@ -19,7 +19,8 @@ async function fixture() {
     sessions.set(childID,{parentID:"main",outcome});
     await hooks["execute.after"]({...e,status:"completed",result:{metadata:{sessionID:childID}}});
   };
-  return {call,finish,guard,sessions,advance:()=>inputKey++,setReady:v=>ready=v,newTask:()=>values.set("task/main",{active:true,id:"second"})};
+  const recovery=async(exit=0)=>{const e={tool:"shell",sessionID:"main",id:"recovery"+(++i),input:{command:"python3 .flutter-harness/bin/harness.py review-recovery"}};await hooks["execute.before"](e);await hooks["execute.after"]({...e,status:"completed",result:{metadata:{exit}}});};
+  return {call,finish,guard,sessions,recovery,advance:()=>inputKey++,setReady:v=>ready=v,newTask:()=>values.set("task/main",{active:true,id:"second"})};
 }
 test("one advisor attempt is reserved even across concurrent requests", async()=>{
   const {call,guard}=await fixture();
@@ -42,10 +43,11 @@ test("sequential read-only consultations and no workers",async()=>{
   await assert.rejects(call("advisor"),/wait for the current/);
   assert.match(await guard.status("main"),/completion/);
 });
-test("two substantive reviews remain bounded",async()=>{
+test("three substantive reviews remain bounded",async()=>{
   const {call,finish,advance}=await fixture();
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r3");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 test("missing evidence spends no review; changed evidence after BLOCKED allows bounded recovery",async()=>{
@@ -56,8 +58,9 @@ test("missing evidence spends no review; changed evidence after BLOCKED allows b
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r2");
   advance(); await finish(await call("reviewer"),"r3");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
-  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3"]);
+  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3","r4"]);
 });
 
 test("one unchanged-input adjudication carries actual findings, then stops or permits targeted repair",async()=>{
@@ -69,6 +72,7 @@ test("one unchanged-input adjudication carries actual findings, then stops or pe
   await finish(second,"r2");
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r3");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 
@@ -77,6 +81,7 @@ test("new task in same root starts fresh budgets",async()=>{
   await finish(await call("advisor"),"a1");
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   await assert.rejects(call("advisor"),/budget exhausted/);
   newTask();
@@ -94,4 +99,19 @@ test("a late child result from a previous generation cannot be registered in the
   assert.deepEqual(await guard.sessions("main"),["main"]);
   await finish(await call("advisor"),"fresh");
   assert.deepEqual(await guard.sessions("main"),["main","fresh"]);
+});
+
+ test("one owner-approved recovery grants exactly one review for the bound candidate",async()=>{
+  const {call,finish,advance,recovery}=await fixture();
+  await finish(await call("reviewer"),"r1");
+  advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r3");
+  await assert.rejects(recovery(),/only applies/);
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+  await recovery(1);
+  await assert.rejects(call("reviewer"),/budget exhausted/);
+  await recovery();
+  await finish(await call("reviewer"),"r4");
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+  await assert.rejects(recovery(),/already granted or used/);
 });
