@@ -219,12 +219,9 @@ def fingerprint(root, exclude=lambda name: False):
     return h.hexdigest()
 
 
-def visual_scope(root, platform):
-    """Conservative platform runtime inputs, separate from the full delivery digest.
-    Standard project layout: tests and other platform trees are not runtime inputs.
-    Include them if pubspec references them; all unknown paths remain inputs.
-    The task identity prevents cross-task reuse.
-    """
+def platform_scope(root, platform, *, runtime=False):
+    """Platform inputs; keep unknown paths conservatively, and separate runtime
+    compilation from scenario evidence. The task identity prevents cross-task reuse."""
     require(platform in ("android", "ios", "web"), "Invalid visual platform")
     task = read_json(work(root) / "task.json")
     require(task.get("branch") == text(git(root, "branch", "--show-current")),
@@ -232,13 +229,35 @@ def visual_scope(root, platform):
     pubspec = (root / "pubspec.yaml").read_text(encoding="utf-8")
     def excluded(name):
         top = name.split("/", 1)[0]
-        if top in ("android", "ios", "web") and top != platform:
-            return top + "/" not in pubspec
-        if top == "test" and name.endswith("_test.dart"):
-            return "test/" not in pubspec
+        if re.search(r"(?<![\w.-])" + re.escape(top) + r"(?:[/\\]|['\"\s]|$)", pubspec):
+            return False  # possible explicit asset or path dependency
+        if check_scope.native_input(name) and top != platform:
+            return True
+        if top in ("test", "integration_test") and (runtime or name.endswith(".dart")):
+            return True
+        if runtime and check_scope.scenario_input(name):
+            return True
+        if check_scope.docs_input(name):
+            return True
         return False
     return manifest_digest({"platform": platform, "task": task,
                             "inputs": fingerprint(root, excluded)})
+
+
+def visual_scope(root, platform):
+    return platform_scope(root, platform)
+
+
+def runtime_scope(root, platform):
+    if not (work(root) / "task.json").is_file():
+        return fingerprint(root)
+    return platform_scope(root, platform, runtime=True)
+
+
+def runtime_matches(root, receipt, platform, digest):
+    return receipt.get("platform") == platform and (
+        receipt.get("runtime_scope") == runtime_scope(root, platform)
+        if "runtime_scope" in receipt else receipt.get("digest") == digest)
 
 
 def visual_folder(root, platform, digest):
@@ -460,7 +479,7 @@ def check_candidate(root,c,attempt):
                 "Task baseline is not an ancestor")
     progress_path = work(root) / "check-progress.json"
     prior = read_json(progress_path) if progress_path.is_file() else None
-    initial, _ = check_scope.plan(root, task, prior)
+    initial, _ = check_scope.plan(root, task, prior, prepare_only=True)
     if initial["pub_get"] or initial["format"]:
         logs = Path(tempfile.mkdtemp(prefix="prepare-", dir=work(root)))
         if initial["pub_get"]:
@@ -1042,13 +1061,13 @@ def launch_auto(root,c,only=None,fresh=False):
             # Reuse only on the pinned native device with a live screenshot probe.
             # --fresh deliberately reinstalls/relaunches if the app was stopped,
             # replaced, or another app is foregrounded.
-            if (not fresh and pin and platform!="web" and old.get("digest")==digest
-                    and old.get("platform")==platform and old.get("device")==target):
+            if (not fresh and pin and platform!="web" and runtime_matches(root,old,platform,digest)
+                    and old.get("device")==target):
                 event(root,"runtime-reused",platform=platform,digest=digest)
                 result = {"status":"READY","platform":platform,"target":target,"digest":digest,
                           "reused":True,"note":"Prior launch reused; inspect actual foreground UI or use --fresh"}
             else:
-                result = launch(root,c,platform,target,preprobed=True,emit=False)
+                result = launch(root,c,platform,target,preprobed=True,emit=False,force=fresh)
         except (Blocked,OSError,ValueError,subprocess.TimeoutExpired) as exc:
             unavailable.append({"platform":platform,"device":target,"reason":str(exc)[:800]})
             event(root,"runtime-target-failed",platform=platform,error_type=type(exc).__name__)
@@ -1066,10 +1085,11 @@ def launch_auto(root,c,only=None,fresh=False):
                   "No runtime target could launch; inspect retained logs")
 
 
-def launch(root,c,platform,device,*,preprobed=False,emit=True):
+def launch(root,c,platform,device,*,preprobed=False,emit=True,force=False):
     require_checkpoint(root,c)
     require(platform != "web" or c["profile"] == "mobile-web", "Web disabled")
     digest = fingerprint(root)
+    scope = runtime_scope(root, platform)
     receipt = work(root) / "runtime.json"
     previous = read_json(receipt) if receipt.exists() else {}
     receipt.unlink(missing_ok=True)
@@ -1078,7 +1098,7 @@ def launch(root,c,platform,device,*,preprobed=False,emit=True):
         # Fail on missing Chromium before expensive Flutter Web compilation.
         if not preprobed:
             probe_runtime(root, platform)
-        action = "status" if previous.get("digest") == digest and previous.get("platform") == "web" else "start"
+        action = "status" if not force and runtime_matches(root,previous,platform,digest) else "start"
         try:
             result = text(run(root, sys.executable, str(HERE / "web-preview.py"),
                               action, capture=True))
@@ -1100,7 +1120,7 @@ def launch(root,c,platform,device,*,preprobed=False,emit=True):
             event(root, "runtime-launch-log", platform=platform, log=str(log.relative_to(root)))
             run(root, "flutter", "run", "--no-resident", "-d", device, log=log, timeout=900)
     require(fingerprint(root) == digest, "Runtime source changed during launch")
-    atomic_json(receipt, {"digest": digest, "platform": platform, "device": device})
+    atomic_json(receipt, {"digest": digest, "runtime_scope":scope, "platform": platform, "device": device})
     event(root, "runtime-ready", platform=platform, digest=digest)
     result = {"status":"READY","platform":platform,"target":device,"digest":digest}
     if emit:
@@ -1113,8 +1133,8 @@ def capture(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixtur
     require(0.5 <= settle <= 5, "Settle must be between 0.5 and 5 seconds")
     current = read_json(work(root) / "runtime.json")
     digest = fingerprint(root)
-    require(current.get("digest") == digest and current.get("platform") == platform,
-            "Launch this candidate/platform before capture")
+    require(runtime_matches(root,current,platform,digest),
+            "Launch this affected platform runtime before capture")
     device = current["device"]
     scope = visual_scope(root, platform)
     directory = visual_folder(root, platform, digest)
@@ -1165,7 +1185,7 @@ def capture(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixtur
         require(fingerprint(root) == digest, "Stale capture")
         require(not scenario or hashlib.sha256((root/scenario).read_bytes()).hexdigest()==scenario_hash,"Capture scenario changed during execution")
         require(read_json(work(root) / "runtime.json") == current, "Runtime target changed during capture")
-        atomic_json(image.with_suffix(".json"), {"digest": digest, "visual_scope": scope, "label": label, "platform": platform,
+        atomic_json(image.with_suffix(".json"), {"digest": digest, "runtime_digest":current["digest"], "visual_scope": scope, "label": label, "platform": platform,
                     "target": device, "theme": theme, "viewport": viewport if platform == "web" else None,
                     "size": size, "scenario": scenario, "scenario_sha256":scenario_hash, "fixture":fixture, "sha256": hashlib.sha256(data).hexdigest(),
                     "path": str(image)})
@@ -1214,7 +1234,7 @@ def capture_plan(root,c,refresh=()):
             if item["label"] not in refresh and reusable_capture(image,expected):
                 event(root,"visual-reused",platform=platform,label=item["label"],theme=theme,digest=digest)
                 continue
-            require(runtime.get("digest")==digest, "Missing affected capture; launch exact checked candidate")
+            require(runtime_matches(root,runtime,platform,digest), "Missing affected capture; launch current platform runtime")
             capture(root,platform,item["label"],theme,item.get("viewport") or "390,844",
                     scenario=item["scenario"],fixture=plan.get("fixture"))
     visual_evidence(root,any(x["kind"]=="interaction" for x in items))
@@ -1444,8 +1464,12 @@ def diagnostics(root, sessions, *, local_only=False):
         for path in run_dir.glob("check-*.tsv"):
             try:
                 with path.open(encoding="utf-8") as stream:
-                    reports.append({"report":str(path.relative_to(root)),"checks":list(csv.DictReader(stream,delimiter="\t"))})
-            except OSError:
+                    report={"report":str(path.relative_to(root)),"checks":list(csv.DictReader(stream,delimiter="\t"))}
+                scope_path=run_dir/"scope.json"
+                if scope_path.is_file():
+                    report["scope"]=read_json(scope_path)
+                reports.append(report)
+            except (OSError,ValueError,Blocked):
                 errors.append("Unreadable standard report")
     data["standard_runs"]=reports
     data["errors"]=errors

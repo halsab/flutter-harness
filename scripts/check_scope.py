@@ -64,7 +64,7 @@ def environment(root):
             tools.append((name, "missing"))
     try:
         cfg = json.loads((root / ".dart_tool/package_config.json").read_text())
-        packages = cfg["packages"]
+        packages = sorted(cfg["packages"], key=lambda p: p["name"])
     except (OSError, ValueError, KeyError, TypeError):
         packages = None
     return hashlib.sha256(json.dumps([tools, packages], sort_keys=True).encode()).hexdigest()
@@ -148,6 +148,8 @@ def directives(source):
             if t == "(":
                 balanced()
             continue
+        if t == "augment":
+            raise UnknownScope("Augmentation dependencies are not supported")
         if t not in ("library", "import", "export", "part"):
             break
         kind = t
@@ -164,6 +166,8 @@ def directives(source):
                 result.append(uri())
         # Library names, deferred/as and show/hide end at the semicolon.
         while t not in (";", None):
+            if kind in ("import", "export", "part") and t.startswith(("'", '"', "r'", 'r"')):
+                raise UnknownScope("Unexpected string in Dart directive")
             advance()
         need(";")
     return result
@@ -228,11 +232,15 @@ def docs_input(name):
     return name.startswith("docs/") or ("/" not in name and name.lower().endswith((".md", ".txt")))
 
 
+def scenario_input(name):
+    return name.split("/", 1)[0] in ("maestro", ".maestro", "e2e", "playwright") or name.startswith("playwright.config.")
+
+
 def known_dart(name):
     return name.endswith(".dart") and name.startswith(("lib/", "test/", "integration_test/", "tool/"))
 
 
-def plan(root, task=None, prior=None):
+def plan(root, task=None, prior=None, *, prepare_only=False):
     base, env, current, delta, env_changed, matched = context(root, task, prior)
     deps = any(dependency_input(n) for n in delta)
     pub_get = not base or env_changed or deps or not (root / ".dart_tool/package_config.json").is_file()
@@ -243,12 +251,14 @@ def plan(root, task=None, prior=None):
         reason = "SDK/package environment changed"
     elif deps:
         reason = "package dependencies changed"
-    elif any(not (known_dart(n) or native_input(n) or docs_input(n)) for n in delta):
+    elif any(not (known_dart(n) or native_input(n) or docs_input(n) or scenario_input(n)) for n in delta):
         reason = "global or unclassified input changed"
     formats = sorted(n for n in delta if known_dart(n) and (root / n).is_file())
     if not base:
         formats = [n for n in ("lib", "test", "integration_test") if (root / n).is_dir()]
-    dart_changed = {n for n in delta if known_dart(n)}
+    if prepare_only:
+        return {"pub_get": pub_get, "format": formats}, None
+    dart_changed = {n for n in delta if n.endswith(".dart")}
     selected = set()
     uncovered = []
     if not reason and delta:
@@ -256,7 +266,7 @@ def plan(root, task=None, prior=None):
             reverse, tests, io_sources = graph(root)
             selected = closure(reverse, dart_changed) & tests
             # File-reading tests can depend on native/config/docs outside Dart imports.
-            if any(native_input(n) or docs_input(n) for n in delta):
+            if any(native_input(n) or docs_input(n) or scenario_input(n) for n in delta):
                 selected |= closure(reverse, io_sources) & tests
             uncovered = sorted(n for n in dart_changed if n.startswith("lib/") and
                                (root / n).is_file() and not (closure(reverse, {n}) & tests))

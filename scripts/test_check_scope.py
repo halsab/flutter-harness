@@ -80,6 +80,13 @@ class Impact(unittest.TestCase):
         p, _ = self.plan(progress)
         self.assertEqual(p["tests"],["test/native_test.dart"])
 
+    def test_maestro_edit_does_not_trigger_full_flutter_suite(self):
+        self.write("maestro/location.yaml","appId: demo\n---\n- tapOn: Search\n")
+        p, _ = self.plan()
+        self.assertEqual(p["mode"],"none")
+        self.assertFalse(p["pub_get"])
+        self.assertFalse(p["analyze"])
+
     def test_dependency_changes_expand_once(self):
         self.write("pubspec.yaml","name: demo\ndependencies:\n  x: any\n")
         p, progress = self.plan()

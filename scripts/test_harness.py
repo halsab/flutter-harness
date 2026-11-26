@@ -162,6 +162,25 @@ class Lifecycle(unittest.TestCase):
             h.launch_auto(self.root,self.c,fresh=True)
             launch.assert_called_once()
 
+    def test_pinned_ios_runtime_reuses_android_and_test_helper_changes(self):
+        h.atomic_json(h.work(self.root)/"runtime-selection.json",{"branch":"feature/test","platform":"ios","device":"phone"})
+        old=h.fingerprint(self.root)
+        scope=h.runtime_scope(self.root,"ios")
+        h.atomic_json(h.work(self.root)/"runtime.json",{"platform":"ios","device":"phone","digest":old,"runtime_scope":scope})
+        self.write("android/app/src/main/AndroidManifest.xml","other platform")
+        self.write("test/helpers.dart","test helper")
+        digest=h.fingerprint(self.root)
+        self.assertNotEqual(old,digest)
+        self.assertEqual(scope,h.runtime_scope(self.root,"ios"))
+        h.atomic_json(h.work(self.root)/"check.json",{"status":"PASS","digest":digest})
+        with patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch") as launch:
+            h.launch_auto(self.root,self.c)
+            launch.assert_not_called()
+        self.write("maestro/flow.yaml","scenario only")
+        self.assertEqual(scope,h.runtime_scope(self.root,"ios"))
+        self.write("ios/Runner/Info.plist","affected platform")
+        self.assertNotEqual(scope,h.runtime_scope(self.root,"ios"))
+
     def test_launch_does_not_capture_baseline_automatically(self):
         with patch.object(h,"runtime_targets",return_value=[("ios","phone")]),patch.object(h,"probe_runtime",return_value=[390,844]),patch.object(h,"launch",return_value={"status":"READY","platform":"ios","target":"phone"}),patch.object(h,"capture") as cap:
             h.launch_auto(self.root,self.c)
@@ -466,6 +485,7 @@ class Lifecycle(unittest.TestCase):
         before=h.visual_evidence(self.root,True)
         self.write("ios/Runner/Info.plist","other platform")
         self.write("test/persistence_test.dart","new test")
+        self.write("test/fixtures/helper.dart","changed test helper")
         after=h.visual_evidence(self.root,True)
         self.assertNotEqual(before["digest"],after["digest"])
         self.assertEqual(before["evidence_digest"],after["evidence_digest"])
@@ -534,6 +554,55 @@ class Lifecycle(unittest.TestCase):
         self.write("lib/large.dart","// changed\n"*401)
         with self.assertRaisesRegex(h.Blocked,"Large uncommitted task slice"):
             h.require_checkpoint(self.root,self.c)
+
+    def test_failed_scope_keeps_last_success_and_retry_selects_changed_test(self):
+        self.write(".gitignore","/.flutter-harness/work/\n/.flutter-harness/previews/\n/.dart_tool/\n")
+        # Save ignore config in the first verified candidate, then make test-only edits.
+        self.write(".dart_tool/package_config.json",'{"packages":[]}')
+        self.write("lib/main.dart","int x=1;")
+        self.write("test/a_test.dart","import '../lib/main.dart';\n")
+        self.write("test/b_test.dart","void main() {}\n")
+        real=h.run
+        fail=False
+        invocations=[]
+        def fake(root,*args,**kw):
+            nonlocal fail
+            if args[0] in ("flutter","dart"):
+                invocations.append(args)
+                return b""
+            if args[0]=="bash" and str(args[1]).endswith("check.sh"):
+                plan=h.read_json(h.Path(args[-1]))
+                invocations.append(("runner",plan))
+                folder=h.Path(kw["env"]["HARNESS_ARTIFACTS_DIR"])
+                flags={"format":bool(plan["format"]),"product":plan["product"],
+                       "analyze":plan["analyze"],"flutter-tests":plan["mode"]!="none"}
+                rows=["check\tstatus\texit_code"]
+                for label,enabled in flags.items():
+                    status="FAIL" if fail and label=="flutter-tests" else "PASS" if enabled else "SKIP"
+                    rows.append(f"{label}\t{status}\t{1 if status=='FAIL' else 0}")
+                (folder/"check-fake.tsv").write_text("\n".join(rows)+"\n")
+                if fail:
+                    raise h.Blocked("test failure")
+                return b""
+            return real(root,*args,**kw)
+        with patch.object(h,"run",side_effect=fake):
+            h.check(self.root,self.c)
+            prior=(h.work(self.root)/"check-progress.json").read_bytes()
+            self.write("test/a_test.dart","import '../lib/main.dart'; // regression\n")
+            fail=True
+            with self.assertRaisesRegex(h.Blocked,"test failure"):
+                h.check(self.root,self.c)
+            self.assertEqual((h.work(self.root)/"check-progress.json").read_bytes(),prior)
+            self.assertFalse(h.current_check(self.root,h.fingerprint(self.root)))
+            self.write("test/a_test.dart","import '../lib/main.dart'; // repaired\n")
+            fail=False
+            h.check(self.root,self.c)
+            self.assertEqual(invocations[-1][1]["tests"],["test/a_test.dart"])
+            self.assertFalse(invocations[-1][1]["pub_get"])
+            self.assertTrue(h.current_check(self.root,h.fingerprint(self.root)))
+            count=len(invocations)
+            h.check(self.root,self.c)
+            self.assertEqual(len(invocations),count)
 
     def test_identical_successful_check_reused(self):
         self.write("lib/main.dart","verified")

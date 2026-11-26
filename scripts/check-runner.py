@@ -106,7 +106,7 @@ def main():
             ("format", ["dart","format","--output=none","--set-exit-if-changed",*scope["format"]] if scope["format"] else [],60),
             ("product",[sys.executable,".flutter-harness/bin/check-product.py","."] if scope["product"] else [],60),
             ("analyze",["flutter","analyze","--no-pub"] if scope["analyze"] else [],120),
-            ("flutter-tests",test + scope["tests"] if scope["mode"] != "none" else [],suite_timeout),
+            ("flutter-tests",test + (scope["tests"] if scope["mode"] == "selected" else []) if scope["mode"] != "none" else [],suite_timeout),
         ]
     if a.level=="full":
         steps.append(("android-build",["flutter","build","apk","--debug"],600))
