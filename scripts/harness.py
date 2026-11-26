@@ -251,20 +251,21 @@ def begin(root, c, name):
     current = text(git(root, "symbolic-ref", "--short", "HEAD"))
     task_path = work(root)/"task.json"
     base_head = text(git(root,"rev-parse","origin/"+base))
-    if current == name and task_path.is_file():
-        task = read_json(task_path)
+    task = read_json(task_path) if task_path.is_file() else {}
+    if current == name and task:
         if all(task.get(k)==v for k,v in {"branch":name,"base_head":base_head,"revision":c["revision"]}.items()):
             output(status="PASS",branch=name,base=base,reused=True)
             return
     if current != name:
         git(root, "switch", "-c", name, "origin/" + base)
+    if current != name or task.get("branch") != name:
         for filename in ("check.json","delivery.json","delivery-result.json","delivery-state.json","runtime.json","visual-plan.json","visual-preflight.json","runtime-selection.json","sessions.json","baseline.json","check-attempt.json","e2e-android.json","e2e-ios.json","e2e-web.json"):
             (work(root)/filename).unlink(missing_ok=True)
     require(text(git(root, "merge-base", "HEAD", "origin/" + base)) ==
             text(git(root, "rev-parse", "origin/" + base)),
             "Feature branch does not contain current integration base")
     installed_revision(root,c)
-    atomic_json(task_path,{"branch":name,"base_head":base_head,"revision":c["revision"],"baseline_digest":fingerprint(root)})
+    atomic_json(task_path,{"branch":name,"base_head":base_head,"revision":c["revision"],"baseline_digest":fingerprint(root),"started_at":int(time.time()*1000)})
     event(root, "begin", branch=name, base=base)
     output(status="PASS", branch=name, base=base)
 
@@ -1176,7 +1177,7 @@ def diagnostics(root, sessions, *, local_only=False):
     """Always retain local evidence; usage export is best effort."""
     directory = work(root)
     errors = []
-    data = {"harness":None,"usage":None,"artifacts":{}}
+    data = {"harness":None,"usage":None,"usage_scope":"session-cumulative","artifacts":{}}
     try:
         data["harness"]=installed_revision(root,config(root))
     except (OSError,ValueError,KeyError,Blocked,subprocess.TimeoutExpired) as exc:
@@ -1201,9 +1202,9 @@ def diagnostics(root, sessions, *, local_only=False):
         else:
             events=events[-100:]
     else:
-        start=next((i for i,x in enumerate(events) if x.get("stage")=="task-start" and x.get("session") in sessions),None)
+        start=next((i for i in range(len(events)-1,-1,-1) if events[i].get("stage")=="task-start" and events[i].get("session") in sessions),None)
         if start is not None:
-            end=next((i for i in range(start+1,len(events)) if events[i].get("stage")=="task-start" and events[i].get("session") not in sessions),len(events))
+            end=next((i for i in range(start+1,len(events)) if events[i].get("stage")=="task-start"),len(events))
             events=events[start:end]
         else:
             events=events[-100:]

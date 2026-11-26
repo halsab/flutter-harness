@@ -133,7 +133,7 @@ test("large untracked source counts toward review effort and stays stable after 
 });
 test("mock V2 hooks deny risky push until real child PASS at required effort, then preserve ask; stale source blocks again", async t => {
   const {root,git}=await fixture(t);
-  const values=new Map([["task/main",{active:true,request:"Удалить все завершённые задачи"}]]);
+  const values=new Map([["task/main",{active:true,id:"first",request:"Удалить все завершённые задачи"}]]);
   const hooks={}; let child={parentID:"main",agent:"reviewer",outcome:"running",model:{providerID:"openai",id:"gpt-6-luna",variant:"medium"}};
   const ctx={
     storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
@@ -191,7 +191,7 @@ test("explicit redesign cannot publish on a generic reviewer PASS", async t => {
   const {root,git}=await fixture(t);
   await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// visual change\n");
-  const values=new Map([["task/main",{active:true,request:"Переработай интерфейс приложения"}]]);
+  const values=new Map([["task/main",{active:true,id:"first",request:"Переработай интерфейс приложения"}]]);
   const hooks={};
   let verdict="VERDICT: PASS", visualReady=false, visualDigest="one";
   const ctx={
@@ -236,7 +236,7 @@ test("combined production hooks reserve no reviewer before evidence and bind act
   await writeFile(join(root,"lib/data/task_repository.dart"),"void old() {}\n");
   await mkdir(join(root,"lib/features/tasks/screens"),{recursive:true});
   await writeFile(join(root,"lib/features/tasks/screens/tasks.dart"),"// focused menu change\n");
-  const values=new Map([["task/main",{active:true,request:"Измени кнопку сортировки"}]]);
+  const values=new Map([["task/main",{active:true,id:"first",request:"Измени кнопку сортировки"}]]);
   await mkdir(join(root,".flutter-harness/work"),{recursive:true});
   await writeFile(join(root,".flutter-harness/work/delivery.json"),JSON.stringify({visual_required:true,visual_interaction:true}));
   const hooks={}, children=new Map([["main",{}]]);
@@ -291,4 +291,27 @@ test("disputed acceptance requires explicit resolution of prior findings",()=>{
  assert.equal(resolvedDispute(m("VISUAL: PASS\nVERDICT: PASS")),false);
  assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVISUAL: PASS\nVERDICT: PASS")),true);
  assert.equal(resolvedDispute(m("ADJUDICATION: RESOLVED\nVERDICT: CHANGES_REQUIRED")),false);
+});
+
+test("same root with a new task generation never inherits check or late review evidence",async t=>{
+  const {root}=await fixture(t);
+  const values=new Map([["task/main",{active:true,id:"first",request:"fix"}]]);
+  const hooks={};
+  const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
+    tool:{hook:async(n,f)=>hooks[n]=f},permission:{hook:async(n,f)=>hooks[n]=f},
+    session:{get:async()=>({parentID:"main",agent:"reviewer",outcome:"succeeded",model:{providerID:"openai",id:"gpt-6-luna",variant:"high"}}),context:async()=>[{type:"assistant",content:"VERDICT: PASS"}]}};
+  const q=await registerQualityGate(ctx,root,"app",id=>"task/"+id);
+  const check={tool:"shell",sessionID:"main",id:"old-check",input:{command:"python3 .flutter-harness/bin/harness.py check"}};
+  const pass={status:"completed",result:{metadata:{exit:0},content:"PASS format\nPASS analyze\nPASS flutter-tests"}};
+  await hooks["execute.before"](check);
+  await hooks["execute.after"]({...check,...pass});
+  const review={tool:"subagent",sessionID:"main",id:"old-review",input:{agent:"reviewer"}};
+  await hooks["execute.before"](review);
+  values.set("task/main",{active:true,id:"second",request:"fix another feature"});
+  await hooks["execute.after"]({...review,status:"completed",result:{metadata:{sessionID:"old-child"}}});
+  assert.match(await q.reason("main"),/standard check/);
+  const second={...check,id:"new-check"};
+  await hooks["execute.before"](second);
+  await hooks["execute.after"]({...second,...pass});
+  assert.match(await q.reason("main"),/reviewer verdict/);
 });

@@ -159,14 +159,15 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
   return result;
 }, childStatus = async () => "", managedReview = false, reviewAvailability = async () => "", validateManifest = async () => {
   await exec("python3",[join(root,".flutter-harness/bin/harness.py"),"validate-delivery"],{cwd:root,timeout:15000});
-}, verifyCheck = null) {
-  const key = (id) => "quality/" + id;
-  const pending = (id, call) => "quality-call/" + id + "/" + call;
-  async function readState(id) { return (await ctx.storage.get(key(id))) || {}; }
+}, verifyCheck = null, validateStart = async()=>"", authorizeDelivery = async()=>{}) {
+  const key = (id,task) => "quality/" + id + "/" + task.id;
+  const pending = (id,task,call) => "quality-call/" + id + "/" + task.id + "/" + call;
+  const currentTask = id => ctx.storage.get(taskKey(id));
+  async function readState(id,task) { return (await ctx.storage.get(key(id,task))) || {}; }
   async function view(id) {
-    const task = await ctx.storage.get(taskKey(id));
-    if (!task?.active) return null;
-    const state = await readState(id);
+    const task = await currentTask(id);
+    if (!task?.active || !task.id) return null;
+    const state = await readState(id,task);
     const change = await candidate(root, base, task.request || "", state.failedNames || []);
     let interaction = explicitVisualRequest(task.request || "");
     try {
@@ -199,6 +200,8 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
   async function inputs(id) {
     const v = await view(id);
     if (!v) throw Error("No active task for review");
+    const startIssue=await validateStart(v.task);
+    if (startIssue) throw Error(startIssue);
     if (!(await checked(v))) throw Error("Complete standard check for this exact candidate before review");
     if (managedReview) await validateManifest();
     const visual = v.change.reasons.includes(visualRisk)
@@ -207,6 +210,11 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     return {v, visual, key: JSON.stringify([v.change.digest, visual?.evidence_digest || ""])};
   }
   async function status(id) {
+    const task=await currentTask(id);
+    if (task?.active) {
+      const issue=await validateStart(task);
+      if (issue) return {issue,phase:"begin",digest:"",check:"unknown"};
+    }
     const v = await view(id);
     if (!v) return { issue: "", phase: "work", digest: "", check: "unknown" };
     const currentCheck = await checked(v);
@@ -263,7 +271,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     const effort = v.change.effort;
     event.input = { ...event.input, model: reviewModel + "#" + effort,
       prompt: "[Harness review contract]\n" + extra };
-    await ctx.storage.set(pending(id, event.id), { kind: "review", digest: v.change.digest, visualDigest:visual?.evidence_digest || "",dispute:input.dispute ? {childID:input.dispute.childID} : null });
+    await ctx.storage.set(pending(id,v.task,event.id), { kind: "review", digest: v.change.digest, visualDigest:visual?.evidence_digest || "",dispute:input.dispute ? {childID:input.dispute.childID} : null });
   }
   await ctx.tool.hook("execute.before", async (event) => {
     const id = event.sessionID;
@@ -273,6 +281,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
       if (!task?.active) throw Error("No active root task for delivery");
       const why = await reason(id);
       if (why) throw Error(why);
+      await authorizeDelivery(event,task);
     }
     if (event.tool === "subagent" && event.input?.agent === "reviewer" && !managedReview) {
       await prepareReview(event, await inputs(id));
@@ -280,17 +289,21 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
     if (event.tool !== "shell" || !standardCheck(event.input?.command)) return;
     const v = await view(id);
     if (!v) return;
-    await ctx.storage.set(pending(id,event.id), {kind:"check",digest:v.change.digest,names:v.change.names,product:v.change.product});
+    const startIssue=await validateStart(v.task);
+    if (startIssue) throw Error(startIssue);
+    await ctx.storage.set(pending(id,v.task,event.id), {kind:"check",digest:v.change.digest,names:v.change.names,product:v.change.product});
   });
   await ctx.tool.hook("execute.after", async (event) => {
     const id = event.sessionID;
     if (event.tool !== "shell" && event.tool !== "subagent") return;
-    const call = await ctx.storage.get(pending(id, event.id));
+    const task=await currentTask(id);
+    if (!task?.active || !task.id) return;
+    const call = await ctx.storage.get(pending(id,task,event.id));
     if (!call) return;
-    await ctx.storage.remove(pending(id, event.id));
-    const state = await readState(id);
+    await ctx.storage.remove(pending(id,task,event.id));
+    const state = await readState(id,task);
     if (event.status !== "completed") {
-      if (call.kind === "check") await ctx.storage.set(key(id), {...state, passedDigest: null, lastCheckFailed: true});
+      if (call.kind === "check") await ctx.storage.set(key(id,task), {...state, passedDigest: null, lastCheckFailed: true});
       return;
     }
     if (call.kind === "check") {
@@ -298,18 +311,19 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
       const exit = event.result?.metadata?.exit;
       if (exit === 0 && /PASS format/.test(output) && /PASS analyze/.test(output) && /PASS flutter-tests/.test(output) && (!call.product || /PASS product/.test(output))) {
         const current = await view(id);
+        if (current?.task.id !== task.id) return;
         // CLI formats/resolves dependencies before fingerprinting and checks that
         // inputs did not change during tests. Bind evidence to the resulting tree.
-        await ctx.storage.set(key(id), { ...state, passedDigest: current.change.digest, lastCheckFailed: false });
+        await ctx.storage.set(key(id,task), { ...state, passedDigest: current.change.digest, lastCheckFailed: false });
       } else if (/(?:FAIL|TIMEOUT|INTERRUPTED) flutter-tests/.test(output)) {
-        await ctx.storage.set(key(id), { ...state, passedDigest: null, lastCheckFailed: true, failedNames: unique([...(state.failedNames || []), ...call.names]) });
+        await ctx.storage.set(key(id,task), { ...state, passedDigest: null, lastCheckFailed: true, failedNames: unique([...(state.failedNames || []), ...call.names]) });
       } else {
-        await ctx.storage.set(key(id), { ...state, passedDigest: null, lastCheckFailed: true });
+        await ctx.storage.set(key(id,task), { ...state, passedDigest: null, lastCheckFailed: true });
       }
     } else {
       const childID = event.result?.output?.sessionID || event.result?.metadata?.sessionID;
       if (typeof childID === "string" && childID) {
-        await ctx.storage.set(key(id), { ...state, review: { digest: call.digest, visualDigest:call.visualDigest, childID,dispute:call.dispute } });
+        await ctx.storage.set(key(id,task), { ...state, review: { digest: call.digest, visualDigest:call.visualDigest, childID,dispute:call.dispute } });
       }
     }
   });
@@ -327,5 +341,5 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
       event.effect = "ask";
     }
   });
-  return { reason, status, inputs, prepareReview, clear: (id) => ctx.storage.remove(key(id)) };
+  return { reason, status, inputs, prepareReview, clear: async (id,task) => {task ||= await currentTask(id);if(task?.id)await ctx.storage.remove(key(id,task));} };
 }

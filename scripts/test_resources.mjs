@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { registerResourceGuard } from "../plugins/delivery-guard/resources.mjs";
 async function fixture() {
-  const values=new Map([["task/main",{active:true}]]);
+  const values=new Map([["task/main",{active:true,id:"first"}]]);
   const hooks={}, sessions=new Map([["main",{}],["nested",{parentID:"main"}]]);
   const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v),remove:async k=>values.delete(k)},
     session:{get:async({sessionID})=>sessions.get(sessionID) || {}},
@@ -19,7 +19,7 @@ async function fixture() {
     sessions.set(childID,{parentID:"main",outcome});
     await hooks["execute.after"]({...e,status:"completed",result:{metadata:{sessionID:childID}}});
   };
-  return {call,finish,guard,sessions,advance:()=>inputKey++,setReady:v=>ready=v};
+  return {call,finish,guard,sessions,advance:()=>inputKey++,setReady:v=>ready=v,newTask:()=>values.set("task/main",{active:true,id:"second"})};
 }
 test("one advisor attempt is reserved even across concurrent requests", async()=>{
   const {call,guard}=await fixture();
@@ -70,4 +70,18 @@ test("one unchanged-input adjudication carries actual findings, then stops or pe
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r3");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+});
+
+test("new task in same root starts fresh budgets",async()=>{
+  const {call,finish,guard,newTask,advance}=await fixture();
+  await finish(await call("advisor"),"a1");
+  await finish(await call("reviewer"),"r1");
+  advance(); await finish(await call("reviewer"),"r2");
+  advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
+  await assert.rejects(call("advisor"),/budget exhausted/);
+  newTask();
+  assert.deepEqual(await guard.sessions("main"),["main"]);
+  await finish(await call("advisor"),"a2");
+  await finish(await call("reviewer"),"r3");
+  assert.deepEqual(await guard.sessions("main"),["main","a2","r3"]);
 });
