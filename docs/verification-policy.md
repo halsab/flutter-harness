@@ -12,7 +12,7 @@ operations, native/platform configuration, security, large diffs and
 substantial UI; the semantic flag in delivery.json supplements the lexical
 classifier. Required review is a real read-only child session with actual
 model/variant, matching candidate and final VERDICT: PASS. For visual risk,
-also require current candidate planned screen/interaction light/dark capture receipts before dispatch, and bind review to the exact evidence digest plus VISUAL: PASS
+also require scoped current runtime planned screen/interaction light/dark capture receipts before dispatch, and bind review to the exact evidence digest plus VISUAL: PASS
 immediately before VERDICT: PASS. Read PRODUCT/DESIGN for actual UX criteria.
 Screenshots do not prove interaction correctness.
 
@@ -23,7 +23,7 @@ Declare required_e2e in delivery.json; CLI e2e runs actual tools on the
 launched candidate and writes a digest-bound result. Optional tests not
 needed are NOT RUN. Failed/missing required evidence stops delivery; no
 fabricated report, no hidden fallback, no auto-merge. A material correction
-requires fresh affected checks and at most one substantive targeted independent recheck. A technical BLOCKED/ERROR may permit one extra bounded dispatch; unchanged evidence cannot be re-reviewed merely by asking again.
+requires fresh affected checks and targeted independent recheck; up to two substantive repair rounds are available. A technical BLOCKED/ERROR may permit one extra bounded dispatch; unchanged evidence cannot be re-reviewed merely by asking again.
 
 The standard gate requires current evidence even for routine changes.
 The classifier is conservative and lexical, not semantic understanding.
@@ -35,8 +35,10 @@ The fast standard runner stops at the first failed step; Flutter uses --fail-fas
 
 Use `diagnostics --local` for immediate local evidence without any OpenCode export. The standard diagnostics command persists local facts before attempting usage export.
 
-For focused UI and new screens omit baseline. Capture the original actual screen explicitly before edits only when comparison matters; use its exact task digest. Batch capture reuses exact digest/device/theme/fixture/script-hash receipts; --refresh LABEL forces both themes of one changed state. One fresh read-only adjudication is available for a first CHANGES_REQUIRED on unchanged evidence; it must explicitly resolve every prior finding and return ADJUDICATION: RESOLVED plus the normal required PASS. Confirmed defects still require repair; no third unchanged-input review. The production quality gate reads the CLI's current standard receipt rather than relying on text alone.
+For focused UI and new screens omit baseline. Capture the original actual screen explicitly before edits only when comparison matters; use its exact task digest. Batch capture reuses task-scoped platform runtime input digest/device/theme/fixture/script-hash receipts; --refresh LABEL forces both themes of one changed state. The full delivery/check/review digest remains exact. Test-only Dart files and other platform trees are excluded from the visual input digest in the standard layout unless referenced in pubspec; unknown files, shared Dart, assets, configuration and scripts remain inputs. Capture receipts retain their original candidate digest. Interaction evidence must use a scripted scenario on every platform. Run visual-evidence before relaunching after a fix; use capture-plan only for missing affected states. Do not ask owners to operate routine UI. One fresh read-only adjudication is available for a first CHANGES_REQUIRED on unchanged evidence; it must explicitly resolve every prior finding and return ADJUDICATION: RESOLVED plus the normal required PASS. Confirmed defects still require repair; no third unchanged-input review. The production quality gate reads the CLI's current standard receipt rather than relying on text alone.
 
 The CLI checks that no canonical check holds the checkout check lock before accepting a current PASS receipt for review or delivery.
 
 Task isolation: the OpenCode conversation may span successive tasks. A task generation owns reviewer/consultation/recovery budgets, requirements and pending tool evidence. Successful canonical delivery is reconciled against the exact local completion receipt immediately and on the next prompt if the idle hook was interrupted. An unfinished or blocked task retains its limits. A subsequent task requires a fresh canonical begin and feature branch; archived receipts are diagnostic only. Session usage exports remain cumulative for the parent conversation, not per-task token measurements.
+
+Local checkpoint commits save coherent tested slices, without approval, push or acceptance. The final check/review considers the complete task diff, including every local commit. Clean checkpointed work may prepare its first delivery manifest; once publication starts its original manifest is preserved.

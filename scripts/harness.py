@@ -190,13 +190,15 @@ def paths(data):
     return [os.fsdecode(p) for p in data.split(b"\0") if p]
 
 
-def fingerprint(root):
+def fingerprint(root, exclude=lambda name: False):
     """All tracked and nonignored files, including native/assets/configuration.
     Stable across staging/commit of the same working-tree contents."""
     names = sorted(set(paths(git(root, "ls-files", "-z", "--cached",
                                 "--others", "--exclude-standard"))))
     h = hashlib.sha256()
     for name in names:
+        if exclude(name):
+            continue
         path = root / name
         try:
             mode = path.lstat().st_mode
@@ -214,6 +216,35 @@ def fingerprint(root):
                     h.update(chunk)
         h.update(b"\0")
     return h.hexdigest()
+
+
+def visual_scope(root, platform):
+    """Conservative platform runtime inputs, separate from the full delivery digest.
+    Standard project layout: tests and other platform trees are not runtime inputs.
+    Include them if pubspec references them; all unknown paths remain inputs.
+    The task identity prevents cross-task reuse.
+    """
+    require(platform in ("android", "ios", "web"), "Invalid visual platform")
+    task = read_json(work(root) / "task.json")
+    require(task.get("branch") == text(git(root, "branch", "--show-current")),
+            "Visual evidence belongs to another task")
+    pubspec = (root / "pubspec.yaml").read_text(encoding="utf-8")
+    def excluded(name):
+        top = name.split("/", 1)[0]
+        if top in ("android", "ios", "web") and top != platform:
+            return top + "/" not in pubspec
+        if top == "test" and name.endswith("_test.dart"):
+            return "test/" not in pubspec
+        return False
+    return manifest_digest({"platform": platform, "task": task,
+                            "inputs": fingerprint(root, excluded)})
+
+
+def visual_folder(root, platform, digest):
+    task = read_json(work(root) / "task.json")
+    # Explicit original baselines retain their historical full-digest address.
+    key = digest if digest == task.get("baseline_digest") else visual_scope(root, platform)
+    return root / ".flutter-harness/previews" / key
 
 
 def dirty(root):
@@ -270,6 +301,34 @@ def begin(root, c, name):
     output(status="PASS", branch=name, base=base)
 
 
+def checkpoint_local(root, c, message):
+    """Save a coherent task slice without publishing or claiming acceptance."""
+    name = branch(root, c["integration_branch"])
+    task = read_json(work(root) / "task.json")
+    require(task.get("branch") == name and task.get("revision") == c["revision"],
+            "Checkpoint requires current canonical begin")
+    require(text(git(root, "merge-base", task["base_head"], "HEAD")) == task["base_head"],
+            "Task base is not an ancestor")
+    require(not (work(root) / "delivery-state.json").exists() and
+            not (work(root) / "delivery-result.json").exists(),
+            "Delivery has started; preserve its manifest and resume delivery")
+    require(message.strip(), "Nonempty checkpoint message required")
+    files = dirty(root)
+    require(files, "No task changes to checkpoint")
+    digest = fingerprint(root)
+    git(root, "--literal-pathspecs", "add", "-A", "--", *files)
+    staged = paths(git(root, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", "--"))
+    require(set(staged) == set(files) and fingerprint(root) == digest
+            and not git(root, "diff", "--name-only", "-z")
+            and not git(root, "ls-files", "-z", "--others", "--exclude-standard"),
+            "Checkpoint index differs from task worktree")
+    git(root, "commit", "-m", message)
+    require(not dirty(root) and fingerprint(root) == digest, "Checkpoint changed candidate")
+    head = text(git(root, "rev-parse", "HEAD"))
+    event(root, "local-checkpoint", branch=name, head=head, digest=digest)
+    output(status="SAVED", head=head, digest=digest, published=False)
+
+
 def doctor(root, c, operation, only=None):
     require(only is None or operation=="visual", "--only is for visual preflight")
     if operation == "visual":
@@ -324,6 +383,14 @@ def check(root, c):
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:
             raise Blocked("Standard check already running; inspect check-attempt.json")
+        receipt_path = folder / "check.json"
+        if receipt_path.is_file():
+            prior = read_json(receipt_path)
+            digest = fingerprint(root)
+            if prior.get("status") == "PASS" and prior.get("digest") == digest:
+                event(root, "check-reused", digest=digest)
+                output(status="PASS", digest=digest, reused=True, receipt=str(receipt_path))
+                return
         attempt = {"status":"RUNNING","branch":text(git(root,"branch","--show-current")),
                    "revision":c["revision"],"started_at":int(time.time()*1000),"pid":os.getpid()}
         path = folder/"check-attempt.json"
@@ -538,7 +605,17 @@ def delivery_manifest(root,c):
 def prepare_delivery(root,c,a):
     name = branch(root,c["integration_branch"])
     files = dirty(root)
-    require(files,"No uncommitted task files; retain existing manifest for delivery recovery")
+    path = work(root)/"delivery.json"
+    if (work(root)/"delivery-state.json").is_file() and not files:
+        require(path.is_file(), "Restore original publication manifest")
+        delivery_manifest(root,c)
+        output(status="PASS", branch=name, reused=True)
+        return
+    if not files:
+        task = read_json(work(root)/"task.json")
+        require(task.get("branch") == name and task.get("revision") == c["revision"] and
+                bool(git(root, "diff", "--name-only", task["base_head"], "HEAD")),
+                "No committed task changes to deliver")
     require(a.message.strip() and a.title.strip() and a.body.strip(),"Nonempty delivery text required")
     manifest = {"message":a.message,"title":a.title,"body":a.body,"files":files,
                 "review_required":a.review or a.visual or a.interaction,
@@ -916,7 +993,8 @@ def capture(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixtur
     require(current.get("digest") == digest and current.get("platform") == platform,
             "Launch this candidate/platform before capture")
     device = current["device"]
-    directory = root / ".flutter-harness/previews" / digest
+    scope = visual_scope(root, platform)
+    directory = visual_folder(root, platform, digest)
     directory.mkdir(parents=True, exist_ok=True)
     image = directory / (label + "-" + platform + "-" + theme + ".png")
     scenario_hash = None
@@ -964,7 +1042,7 @@ def capture(root,platform,label,theme,viewport,settle=1.5,scenario=None,*,fixtur
         require(fingerprint(root) == digest, "Stale capture")
         require(not scenario or hashlib.sha256((root/scenario).read_bytes()).hexdigest()==scenario_hash,"Capture scenario changed during execution")
         require(read_json(work(root) / "runtime.json") == current, "Runtime target changed during capture")
-        atomic_json(image.with_suffix(".json"), {"digest": digest, "label": label, "platform": platform,
+        atomic_json(image.with_suffix(".json"), {"digest": digest, "visual_scope": scope, "label": label, "platform": platform,
                     "target": device, "theme": theme, "viewport": viewport if platform == "web" else None,
                     "size": size, "scenario": scenario, "scenario_sha256":scenario_hash, "fixture":fixture, "sha256": hashlib.sha256(data).hexdigest(),
                     "path": str(image)})
@@ -997,18 +1075,20 @@ def capture_plan(root,c,refresh=()):
     digest = fingerprint(root)
     require(current_check(root,digest),"Check exact candidate before capture-plan")
     runtime = read_json(work(root)/"runtime.json")
-    require(runtime.get("digest")==digest and runtime.get("platform")==platform,
-            "Run launch auto for checked candidate before capture-plan")
+    require(runtime.get("platform")==platform, "Run launch auto for the selected platform")
+    scope = visual_scope(root, platform)
+    folder = visual_folder(root, platform, digest)
     require(set(refresh)<=labels,"Unknown capture label in --refresh")
     for item in items:
         for theme in ("light","dark"):
-            image=root/".flutter-harness/previews"/digest/(item["label"]+"-"+platform+"-"+theme+".png")
-            expected={"digest":digest,"label":item["label"],"platform":platform,"theme":theme,"target":runtime["device"],
+            image=folder/(item["label"]+"-"+platform+"-"+theme+".png")
+            expected={"visual_scope":scope,"label":item["label"],"platform":platform,"theme":theme,"target":runtime["device"],
                       "viewport":item.get("viewport") if platform=="web" else None,"scenario":item["scenario"],
                       "fixture":plan.get("fixture"),"scenario_sha256":hashlib.sha256((root/item["scenario"]).read_bytes()).hexdigest()}
             if item["label"] not in refresh and reusable_capture(image,expected):
                 event(root,"visual-reused",platform=platform,label=item["label"],theme=theme,digest=digest)
                 continue
+            require(runtime.get("digest")==digest, "Missing affected capture; launch exact checked candidate")
             capture(root,platform,item["label"],theme,item.get("viewport") or "390,844",
                     scenario=item["scenario"],fixture=plan.get("fixture"))
     visual_evidence(root,any(x["kind"]=="interaction" for x in items))
@@ -1059,7 +1139,8 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
     require(any(s["kind"] == "screen" for s in scenarios), "Missing populated screen scenario")
     require(not require_interaction or any(s["kind"] == "interaction" for s in scenarios),
             "Substantial UI change requires a changed interaction scenario")
-    folder = root / ".flutter-harness/previews" / digest
+    scope = visual_scope(root, platform)
+    folder = visual_folder(root, platform, digest)
     captures = []
     targets = set()
     for item in scenarios:
@@ -1073,19 +1154,21 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
             data = path.read_bytes()
             size = png_size(data)
             require(all(receipt.get(k) == v for k,v in {
-                "digest":digest, "label":item["label"], "platform":platform, "theme":theme,
+                "visual_scope":scope, "label":item["label"], "platform":platform, "theme":theme,
                 "size":size, "viewport":item.get("viewport"),
                 "sha256":hashlib.sha256(data).hexdigest(),
             }.items()) and isinstance(receipt.get("target"), str) and receipt["target"],
                     f"Stale or invalid capture: {path.name}")
+            require(isinstance(receipt.get("digest"),str) and re.fullmatch(r"[0-9a-f]{64}",receipt["digest"]), "Missing original capture candidate")
+            require(receipt.get("fixture")==plan["fixture"], "Capture fixture differs from plan: "+path.name)
             require("scenario" not in item or receipt.get("scenario")==item["scenario"],
                     "Capture scenario differs from planned state: "+path.name)
             if item.get("scenario"):
                 scenario=Path(item["scenario"])
                 require(not scenario.is_absolute() and ".." not in scenario.parts and (root/scenario).is_file() and not (root/scenario).is_symlink(),"Invalid visual scenario")
                 require(receipt.get("scenario_sha256")==hashlib.sha256((root/scenario).read_bytes()).hexdigest(),"Capture scenario content changed: "+path.name)
-            require(platform != "web" or item["kind"] != "interaction" or receipt.get("scenario"),
-                    "Web interaction capture needs a Playwright scenario; a fresh-page screenshot is insufficient")
+            require(item["kind"] != "interaction" or (item.get("scenario") and receipt.get("scenario")),
+                    "Interaction capture requires an executable Maestro/Playwright scenario, not manual UI navigation")
             targets.add(receipt["target"])
             pair.append({**receipt, "path": str(path)})
         require(pair[0]["size"] == pair[1]["size"] and pair[0]["sha256"] != pair[1]["sha256"],
@@ -1119,7 +1202,7 @@ def visual_evidence(root, require_interaction=False, *, emit=True):
                 png_size(data)==first["size"] and (platform=="web" or meta.get("target")==target),
                 "Baseline capture is stale or not comparable to final screen")
         baseline_receipt = {**meta,"path":str(image)}
-    require(fingerprint(root) == digest, "Candidate changed while verifying images")
+    require(fingerprint(root) == digest and visual_scope(root, platform) == scope, "Candidate changed while verifying images")
     # Bind review to the exact declared plan and validated image contents.
     evidence_digest = manifest_digest({"plan": plan, "baseline_sha256": (baseline_receipt or {}).get("sha256"), "captures": [
         {k:v for k,v in item.items() if k != "path"} for item in captures]})
@@ -1265,6 +1348,8 @@ def main():
     p.add_argument("--expect")
     p = sub.add_parser("begin")
     p.add_argument("branch")
+    p = sub.add_parser("checkpoint", help="Save a local task slice without publication")
+    p.add_argument("--message", required=True)
     p = sub.add_parser("lesson", help="Record a confirmed reusable Harness failure, never app details")
     p.add_argument("code", choices=sorted(reporter.SEMANTIC_CODES))
     for cmd in ("check","ci","deliver","verify","completion","status","fingerprint","stop-preview","adopt"):
@@ -1326,13 +1411,15 @@ def main():
         if a.command == "revision":
             output(**installed_revision(root,c,a.expect))
             return 0
-        if a.command in ("begin","check","ci","deliver","verify","completion","launch","capture","capture-plan","prepare-delivery","validate-delivery","visual-evidence","e2e"):
+        if a.command in ("begin","checkpoint","check","ci","deliver","verify","completion","launch","capture","capture-plan","prepare-delivery","validate-delivery","visual-evidence","e2e"):
             installed_revision(root,c)
         if a.command == "doctor":
             doctor(root, c, a.operation, a.only)
         elif a.command == "begin":
             reporter.retry(root)
             begin(root, c, a.branch)
+        elif a.command == "checkpoint":
+            checkpoint_local(root,c,a.message)
         elif a.command == "lesson":
             installed_revision(root,c)
             output(status=reporter.report(root,c.get("revision"),a.code))
@@ -1388,7 +1475,7 @@ def main():
             usage(root, sessions)
         return 0
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
-        if a.command in ("begin", "check", "deliver", "doctor", "launch", "capture", "capture-plan", "prepare-delivery", "validate-delivery", "visual-evidence", "e2e"):
+        if a.command in ("begin", "checkpoint", "check", "deliver", "doctor", "launch", "capture", "capture-plan", "prepare-delivery", "validate-delivery", "visual-evidence", "e2e"):
             try:
                 # Keep compact shareable error classifications; full command logs
                 # remain local. No arbitrary stderr, prompts or environment values.

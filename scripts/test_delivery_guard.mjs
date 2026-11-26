@@ -230,3 +230,10 @@ test("read-only conversation does not require delivery, but a begun or recoverin
   begin=null;await prompt();assert.equal(task().id,id);
   await assert.rejects(idle(),/INCOMPLETE/);assert.equal(task().active,true);
 });
+
+ test("clean local checkpoints may prepare a first delivery manifest",()=>{
+  const result={current:{status:""},publicationStarted:false,reasons:["Delivery incomplete"]};
+  const next=recovery({attempts:0},result,{phase:"manifest",issue:"manifest missing",check:"passed",digest:"a"});
+  assert.equal(next.stop,false);
+  assert.match(next.prompt,/prepare-delivery/);
+});

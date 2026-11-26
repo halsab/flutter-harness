@@ -42,10 +42,11 @@ test("sequential read-only consultations and no workers",async()=>{
   await assert.rejects(call("advisor"),/wait for the current/);
   assert.match(await guard.status("main"),/completion/);
 });
-test("two substantive reviews remain bounded",async()=>{
+test("three substantive reviews remain bounded",async()=>{
   const {call,finish,advance}=await fixture();
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r3");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 test("missing evidence spends no review; changed evidence after BLOCKED allows bounded recovery",async()=>{
@@ -56,8 +57,9 @@ test("missing evidence spends no review; changed evidence after BLOCKED allows b
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r2");
   advance(); await finish(await call("reviewer"),"r3");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
-  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3"]);
+  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3","r4"]);
 });
 
 test("one unchanged-input adjudication carries actual findings, then stops or permits targeted repair",async()=>{
@@ -69,6 +71,7 @@ test("one unchanged-input adjudication carries actual findings, then stops or pe
   await finish(second,"r2");
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r3");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 
@@ -77,6 +80,7 @@ test("new task in same root starts fresh budgets",async()=>{
   await finish(await call("advisor"),"a1");
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
+  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   await assert.rejects(call("advisor"),/budget exhausted/);
   newTask();

@@ -428,17 +428,23 @@ class Lifecycle(unittest.TestCase):
 
     def visual_fixture(self):
         digest = h.fingerprint(self.root)
-        folder = self.root/".flutter-harness/previews"/digest
+        self.write("maestro/menu.yaml","appId: dev.test\n---\n- launchApp\n- tapOn: Menu\n")
+        digest = h.fingerprint(self.root)
+        folder = h.visual_folder(self.root,"android",digest)
         folder.mkdir(parents=True)
-        plan = {"platform":"android","fixture":"mixed short/long realistic records","scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction"}]}
+        scope = h.visual_scope(self.root,"android")
+        plan = {"platform":"android","fixture":"mixed short/long realistic records","scenarios":[{"label":"final","kind":"screen"},{"label":"menu","kind":"interaction","scenario":"maestro/menu.yaml"}]}
         h.atomic_json(h.work(self.root)/"visual-plan.json", plan)
         h.atomic_json(h.work(self.root)/"visual-preflight.json", {"status":"PASS","branch":"feature/test","ready":[{"platform":"android","device":"emulator"}]})
         def write(label, theme, suffix):
             p = folder/(label+"-android-"+theme+".png")
             data = h.PNG+b"\x00\x00\x00\x0dIHDR"+h.struct.pack(">II",390,844)+b"\x08\x02\x00\x00\x00"+suffix
             p.write_bytes(data)
-            h.atomic_json(p.with_suffix(".json"),{"digest":digest,"label":label,"platform":"android","target":"emulator",
-                "theme":theme,"size":[390,844],"viewport":None,"sha256":hashlib.sha256(data).hexdigest()})
+            h.atomic_json(p.with_suffix(".json"),{"digest":digest,"visual_scope":scope,"label":label,"platform":"android","target":"emulator",
+                "theme":theme,"size":[390,844],"viewport":None,"fixture":plan["fixture"],
+                "scenario":"maestro/menu.yaml" if label=="menu" else None,
+                "scenario_sha256":hashlib.sha256((self.root/"maestro/menu.yaml").read_bytes()).hexdigest() if label=="menu" else None,
+                "sha256":hashlib.sha256(data).hexdigest()})
         return folder, write
 
     def test_visual_accepts_no_baseline(self):
@@ -450,6 +456,60 @@ class Lifecycle(unittest.TestCase):
         result=h.visual_evidence(self.root,True)
         self.assertEqual(result["status"],"PASS")
         self.assertIsNone(result["baseline"])
+
+    def test_visual_reuses_other_platform_and_test_only_changes(self):
+        self.write("lib/main.dart","new candidate")
+        _,write=self.visual_fixture()
+        for label in ("final","menu"):
+            for theme in ("light","dark"):
+                write(label,theme,theme.encode())
+        before=h.visual_evidence(self.root,True)
+        self.write("ios/Runner/Info.plist","other platform")
+        self.write("test/persistence_test.dart","new test")
+        after=h.visual_evidence(self.root,True)
+        self.assertNotEqual(before["digest"],after["digest"])
+        self.assertEqual(before["evidence_digest"],after["evidence_digest"])
+        self.write("android/app/src/main/AndroidManifest.xml","affected platform")
+        with self.assertRaises(h.Blocked):
+            h.visual_evidence(self.root,True)
+
+    def test_visual_scope_keeps_shared_config_assets_and_scripts(self):
+        self.write("lib/main.dart","new candidate")
+        _,write=self.visual_fixture()
+        for label in ("final","menu"):
+            for theme in ("light","dark"):
+                write(label,theme,theme.encode())
+        before=h.visual_scope(self.root,"android")
+        self.write("maestro/menu.yaml","different flow")
+        self.assertNotEqual(before,h.visual_scope(self.root,"android"))
+        before=h.visual_scope(self.root,"android")
+        self.write("assets/catalog.json","new content")
+        self.assertNotEqual(before,h.visual_scope(self.root,"android"))
+
+    def test_local_checkpoint_preserves_full_candidate_and_can_prepare_clean_delivery(self):
+        self.write("lib/main.dart","slice one")
+        before=h.fingerprint(self.root)
+        h.checkpoint_local(self.root,self.c,"feat: first slice")
+        self.assertEqual(self.git("status","--porcelain"),"")
+        self.assertEqual(before,h.fingerprint(self.root))
+        self.write("lib/second.dart","slice two")
+        h.checkpoint_local(self.root,self.c,"feat: second slice")
+        self.assertEqual(self.git("rev-list","--count","origin/trunk..HEAD"),"2")
+        a=h.argparse.Namespace(message="change",title="Change",body="Verified",review=True,visual=False,interaction=False,e2e=[])
+        h.prepare_delivery(self.root,self.c,a)
+        self.assertEqual(h.delivery_manifest(self.root,self.c)["files"],[])
+        self.assertTrue(h.delivery_manifest(self.root,self.c)["review_required"])
+
+    def test_identical_successful_check_reused(self):
+        self.write("lib/main.dart","verified")
+        self.receipt(["lib/main.dart"])
+        with patch.object(h,"check_candidate") as check:
+            h.check(self.root,self.c)
+            check.assert_not_called()
+        self.write("lib/main.dart","different")
+        with patch.object(h,"check_candidate") as check:
+            h.check(self.root,self.c)
+            check.assert_called_once()
 
     def test_visual_rejects_unrelated_baseline(self):
         self.write("lib/main.dart","new candidate")

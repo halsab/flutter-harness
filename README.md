@@ -57,8 +57,8 @@ require explicit product-standard migration; sync does not rewrite them.
 Use `mobile` for Android/iOS only, or `mobile-web` to include Web. Replace
 `main` with the actual integration branch. Open OpenCode in the project
 directory, select Build / Luna Medium and give one product task. The agent
-handles branch, checks, relevant review and PR creation; you approve
-publication and merge. No initial screenshot unless comparison is needed.
+handles branch, coherent local checkpoint commits, scoped checks, relevant review and PR creation; you approve
+publication and merge. Ordinary UI interaction is automated with project-local Maestro/Playwright scenarios, not manual requests to the owner. No initial screenshot unless comparison is needed.
 
 ### Agent scope
 

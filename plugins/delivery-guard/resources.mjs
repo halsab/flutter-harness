@@ -38,7 +38,6 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
     const attempts = state.reviews || [];
     if ((state.pending || []).some(x=>x.role==="reviewer") ||
         (await running(id,state)).some(x=>x.role==="reviewer")) return "Wait for the actual reviewer outcome.";
-    if (attempts.length >= 3) return "Harness: reviewer absolute attempt budget exhausted.";
     const outcomes = [];
     for (const attempt of attempts) {
       if (!attempt.childID) { outcomes.push("ERROR"); continue; }
@@ -53,10 +52,11 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
       if (last?.key===key && lastOutcome==="CHANGES_REQUIRED" && attempts.length===1 && !last.dispute) return "";
       return "Harness: reviewer input unchanged; confirmed or unresolved findings must be fixed; no further unchanged-input review.";
     }
-    if (outcomes.filter((x,i)=>!attempts[i].dispute && (x==="PASS" || x==="CHANGES_REQUIRED")).length >= 2)
+    // Three substantive passes (initial plus two repairs), one technical
+    // recovery and one dispute remain finite. Never rerun identical evidence.
+    if (attempts.length >= 5) return "Harness: reviewer absolute attempt budget exhausted.";
+    if (outcomes.filter((x,i)=>!attempts[i].dispute && (x==="PASS" || x==="CHANGES_REQUIRED")).length >= 3)
       return "Harness: substantive reviewer attempt budget exhausted.";
-    if (attempts.length >= 2 && !attempts.some(x=>x.dispute) && !outcomes.some(x=>x==="BLOCKED" || x==="ERROR"))
-      return "Harness: reviewer attempt budget exhausted.";
     if (outcomes.filter(x=>x==="BLOCKED" || x==="ERROR").length >= 2)
       return "Harness: technical reviewer recovery budget exhausted.";
     return "";
@@ -102,8 +102,21 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
             input.dispute={childID:prior.childID,report};
           }
         }
+        if (prior?.childID && prior.key!==input.key && prior.files && input.v?.change?.fileDigests) {
+          const child=await ctx.session.get({sessionID:prior.childID});
+          if (child.parentID!==id) throw Error("Unexpected reviewer ownership");
+          const messages=await ctx.session.context({sessionID:prior.childID});
+          const verdict=reviewVerdict(messages);
+          const final=[...messages].reverse().find(m=>m.type==="assistant" && (typeof m.content==="string" ? m.content.trim() : m.content?.some(x=>x.type==="text" && x.text.trim())));
+          const report=typeof final?.content==="string" ? final.content : final?.content?.filter(x=>x.type==="text").map(x=>x.text).join("\n");
+          if (child.outcome==="succeeded" && ["CHANGES_REQUIRED","PASS"].includes(verdict) && report && report.length<=16000) {
+            const next=input.v.change.fileDigests;
+            const changed=[...new Set([...Object.keys(prior.files),...Object.keys(next)])].filter(p=>prior.files[p]!==next[p]);
+            input.followup={report,changed,visualChanged:prior.visualDigest!==input.visual?.evidence_digest};
+          }
+        }
         await prepareReview(event,input);
-        state.reviews = [...(state.reviews || []),{call:event.id,key:input.key,dispute:!!input.dispute}];
+        state.reviews = [...(state.reviews || []),{call:event.id,key:input.key,dispute:!!input.dispute,files:input.v?.change?.fileDigests,visualDigest:input.visual?.evidence_digest}];
         await record(id,"review-dispatched",{call:event.id,model:event.input.model});
       }
       if (role === "advisor") event.input = {...event.input, model:"openai/gpt-6.2-sol#medium"};

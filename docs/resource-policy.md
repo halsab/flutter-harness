@@ -5,3 +5,5 @@ One task and one implementation agent; one read-only consultation at a time. Bou
 Do not spend a separate model call on reflection or duplicate checks. Report only a confirmed reusable Harness gap with the bounded Reporter; no model call is needed for transport. Replace obsolete instructions/checks when a stronger existing mechanism covers the same invariant; retain independent safeguards and regression tests.
 
 Issues accumulate without a model call for reporting. Analyze accumulated reports only when the owner requests maintenance in the existing local OpenCode session, Luna Medium by default. No separate API budget, scheduled agents, automatic retry or premium escalation.
+
+Save coherent local slices early; no network publication until canonical approval. Reuse unchanged standard receipts and platform-scoped visual evidence; use one scripted Maestro/Playwright plan instead of repeated manual interactions. Initial review is complete; follow-ups use actual prior findings and changed-file hashes. Three substantive reviews, one bounded technical recovery and one adjudication are hard limits, not targets.
