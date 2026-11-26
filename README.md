@@ -77,3 +77,40 @@ The read-only reviewer uses concrete evidence, not speculative refactoring.
 Confirmed reusable Harness gaps are reported to central GitHub Issues by the
 installed Reporter; application-specific regressions stay in the app. See
 [automatic reporting and on-demand maintenance](docs/evolution-automation.md) and [the evolution and Lab evaluation policy](docs/engineering-evolution.md). No separate API credentials or scheduled coding agent.
+
+### Process accumulated Harness Issues
+
+The Reporter automatically records supported, reusable Harness failures in
+[flutter-harness Issues](https://github.com/halsab/flutter-harness/issues)
+using existing local GitHub CLI authentication as `halsab`. No separate API
+key, paid background agent or scheduled repair workflow is required.
+
+When you want to improve Harness, finish any current work, open the central
+Harness repository (not an application repository), and check that the
+working tree is clean:
+
+```bash
+cd ~/Documents/repos/flutter-harness
+git status --short
+```
+
+If clean, update and start OpenCode:
+
+```bash
+git switch main &&
+git pull --ff-only origin main &&
+gh auth status &&
+opencode
+```
+
+Select Build / Luna Medium and give the agent this task:
+
+> Process the accumulated Flutter Harness Issues. Deduplicate and reproduce
+> confirmed problems, fix their root causes, add focused regression tests and
+> open a PR. Preserve the economical model routing and existing quality
+> guarantees. Leave unconfirmed issues open.
+
+The agent follows [the maintenance policy](docs/evolution-automation.md).
+Review the proposed PR and merge after CI passes. Then update installed
+Harness copies in application repositories using the installer in section 2.
+There is no need to analyze each Issue manually.
