@@ -1,9 +1,9 @@
 # Resource policy
 
-One task and one implementation agent; one read-only consultation at a time. Bounded review/advisor calls and recovery. Reuse exact current evidence. No initial runtime build for ordinary UI changes. Run affected failing tests before final standard check. Compact local logs; no extra dispatcher or benchmark suite.
+One Luna Medium Build agent. Choose the cheapest sufficient evidence: source, focused test, representative runtime, then critical E2E. Do not perform a higher-cost step if the lower-cost proof is sufficient. No routine full local suites, mandatory intermediate checks, screenshot matrices or new test scenarios for static corrections.
 
-Do not spend a separate model call on reflection or duplicate checks. Report only a confirmed reusable Harness gap with the bounded Reporter; no model call is needed for transport. Replace obsolete instructions/checks when a stronger existing mechanism covers the same invariant; retain independent safeguards and regression tests.
+Avoid repeated unchanged checks/reviews. Use one independent code review when warranted and one targeted follow-up ordinarily; technical recovery is bounded. Review before final optional automated visual acceptance. Stop repetitive failed attempts and preserve work rather than spending the budget on rituals. Never auto-escalate models. No separate reflection or background agents.
 
-Issues accumulate without a model call for reporting. Analyze accumulated reports only when the owner requests maintenance in the existing local OpenCode session, Luna Medium by default. No separate API budget, scheduled agents, automatic retry or premium escalation.
+Measure task elapsed time and stage counts in diagnostics; sanitized exports use observed task timestamps where available. Unknown-time messages are omitted and explicitly marked partial. Treat tokens as raw counters, not billing. Canonical check refuses a third unchanged failure on identical source and SDK/package identity; fix the cause or park a draft. Review dispatches are bounded. No live token hard cap is asserted without reliable provider counters; budget controls must leave preservation/recovery possible.
 
-Save coherent local slices early; no network publication until canonical approval. Reuse unchanged standard receipts and platform-scoped visual evidence; use one scripted Maestro/Playwright plan instead of repeated manual interactions. Initial review is complete; follow-ups use actual prior findings and changed-file hashes. Three substantive reviews, one bounded technical recovery and one adjudication are hard limits, not targets.
+Keep reporting best effort, no network/model retries in the normal verification path, and use explicit on-demand maintenance.

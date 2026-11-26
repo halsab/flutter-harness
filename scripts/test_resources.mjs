@@ -20,7 +20,7 @@ async function fixture() {
     await hooks["execute.after"]({...e,status:"completed",result:{metadata:{sessionID:childID}}});
   };
   const recovery=async(exit=0)=>{const e={tool:"shell",sessionID:"main",id:"recovery"+(++i),input:{command:"python3 .flutter-harness/bin/harness.py review-recovery"}};await hooks["execute.before"](e);await hooks["execute.after"]({...e,status:"completed",result:{metadata:{exit}}});};
-  return {call,finish,guard,sessions,recovery,advance:()=>inputKey++,setReady:v=>ready=v,newTask:()=>values.set("task/main",{active:true,id:"second"})};
+  return {call,finish,missing:async e=>hooks["execute.after"]({...e,status:"completed",result:{metadata:{}}}),guard,sessions,recovery,advance:()=>inputKey++,setReady:v=>ready=v,newTask:()=>values.set("task/main",{active:true,id:"second"})};
 }
 test("one advisor attempt is reserved even across concurrent requests", async()=>{
   const {call,guard}=await fixture();
@@ -43,11 +43,10 @@ test("sequential read-only consultations and no workers",async()=>{
   await assert.rejects(call("advisor"),/wait for the current/);
   assert.match(await guard.status("main"),/completion/);
 });
-test("three substantive reviews remain bounded",async()=>{
+test("two substantive reviews remain bounded",async()=>{
   const {call,finish,advance}=await fixture();
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
-  advance(); await finish(await call("reviewer"),"r3");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 test("missing evidence spends no review; changed evidence after BLOCKED allows bounded recovery",async()=>{
@@ -58,9 +57,8 @@ test("missing evidence spends no review; changed evidence after BLOCKED allows b
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r2");
   advance(); await finish(await call("reviewer"),"r3");
-  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
-  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3","r4"]);
+  assert.deepEqual(await guard.sessions("main"),["main","r1","r2","r3"]);
 });
 
 test("one unchanged-input adjudication carries actual findings, then stops or permits targeted repair",async()=>{
@@ -72,7 +70,6 @@ test("one unchanged-input adjudication carries actual findings, then stops or pe
   await finish(second,"r2");
   await assert.rejects(call("reviewer"),/unchanged/);
   advance(); await finish(await call("reviewer"),"r3");
-  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
 });
 
@@ -81,7 +78,6 @@ test("new task in same root starts fresh budgets",async()=>{
   await finish(await call("advisor"),"a1");
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
-  advance(); await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   await assert.rejects(call("advisor"),/budget exhausted/);
   newTask();
@@ -105,7 +101,6 @@ test("a late child result from a previous generation cannot be registered in the
   const {call,finish,advance,recovery}=await fixture();
   await finish(await call("reviewer"),"r1");
   advance(); await finish(await call("reviewer"),"r2");
-  advance(); await finish(await call("reviewer"),"r3");
   await assert.rejects(recovery(),/only applies/);
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   await recovery(1);
@@ -114,4 +109,13 @@ test("a late child result from a previous generation cannot be registered in the
   await finish(await call("reviewer"),"r4");
   advance(); await assert.rejects(call("reviewer"),/budget exhausted/);
   await assert.rejects(recovery(),/already granted or used/);
+});
+
+
+test("missing child ID is a recoverable technical failure, not stuck pending",async()=>{
+  const {call,missing,finish,guard}=await fixture();
+  await missing(await call("reviewer"));
+  assert.equal(await guard.status("main"),"");
+  await finish(await call("reviewer"),"r2");
+  assert.equal(await guard.status("main"),"");
 });

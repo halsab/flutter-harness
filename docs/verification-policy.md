@@ -1,48 +1,14 @@
-# Verification policy
+# Proportionate verification policy
 
-Ordinary application changes require one successful CLI check on the exact
-candidate, then delivery. Check runs dependency resolution, formatting,
-product conventions, analyzer and fast Flutter tests. CI independently
-checks formatting without rewriting files. Use focused unit/widget tests
-for material changed behavior and error paths; no test quotas or duplicate
-all-platform scenarios. A green old suite is not proof of new behavior. For a bug, reproduce the original failure (or establish a precise static proof), fix the cause and verify the original scenario; retain material executable regression protection.
+The objective is sufficient evidence of the original request, not completion of a ritual. Choose the cheapest reliable proof. A small task has a small acceptance scope. Preserve the product standard, regression protection, owner approval, exact check receipts and independent full PR CI.
 
-Risk-based review covers interacting behavior, persistent/destructive
-operations, native/platform configuration, security, large diffs and
-substantial UI; the semantic flag in delivery.json supplements the lexical
-classifier. Required review is a real read-only child session with actual
-model/variant, matching candidate and final VERDICT: PASS. For visual risk,
-also require scoped current runtime planned screen/interaction light/dark capture receipts before dispatch, and bind review to the exact evidence digest plus VISUAL: PASS
-immediately before VERDICT: PASS. Read PRODUCT/DESIGN for actual UX criteria.
-Screenshots do not prove interaction correctness.
+- Source-first: verify concrete source facts (text, colors, sizes, constraints, state, interactions) directly. Add focused behavioral tests where proof is insufficient or a material regression needs protection. For bugs establish the original failure or precise source proof. No quotas, no repeated full suites locally.
+- Run one canonical impact check after implementation and again only for affected inputs after material fixes. Checkpoints preserve work; they do not imply acceptance and need not trigger checks.
+- Self-review all original criteria. Independent code review for actual material risk or explicit request, with concrete findings and one targeted follow-up ordinarily. Routine styles and paths alone do not mandate visual review. The reviewer can verify corrections statically. Technical failure is not a product defect.
+- Final runtime inspection only for material appearance/behavior that cheaper evidence cannot establish. Prefer one already-running affected target and hot reload where supported. No mandatory screenshots, theme matrix, baseline or automation for routine UI. Significant new UI needs an actual final inspection when necessary. Explicit automated acceptance uses capture-plan and exact receipts; specify only needed states/themes, scenarios for real interactions. Do not recapture before review or for source-verifiable corrections. Never claim stale evidence is current.
+- Code review is independent of optional automated visual evidence. If explicitly required, that evidence is verified at final delivery, not as admission to code review.
+- Use one normal Luna Medium Build. Reviewer Medium for focused changes, High for genuinely broad/critical risk. No automatic premium escalation, extra workers or repeated unchanged reviews.
+- After sufficient local checks and review, create the owner-approved PR. Full CI is independent; do not claim CI PASS from local evidence. No automatic merge. Known material defects or missing required acceptance must not be presented as complete. If acceptance stalls, preserve local work and offer an owner-approved Draft PR with outstanding criteria. Never publish without permission.
+- Use task-scoped diagnostic facts; compare actual outcomes, elapsed time, checks, reviews and exported token counters in the Lab. Do not infer cost savings from passing Harness unit tests.
 
-Each blocking review finding names a violated requirement/invariant, source or runtime location, reachable scenario, expected/actual result, impact and evidence. A read-only reviewer may prove a defect statically, cite existing execution/capture evidence, or hand the smallest reproduction to Build; it must not claim execution it did not perform. Unconfirmed hypotheses and preferences are not blocking defects. Missing required evidence remains BLOCKED. Do not introduce an additional reviewer or a rigid finding parser; semantic quality stays with the existing reviewer and parent.
-
-For critical native/browser acceptance use one relevant executable scenario.
-Declare required_e2e in delivery.json; CLI e2e runs actual tools on the
-launched candidate and writes a digest-bound result. Optional tests not
-needed are NOT RUN. Failed/missing required evidence stops delivery; no
-fabricated report, no hidden fallback, no auto-merge. A material correction
-requires fresh affected checks and targeted independent recheck; up to two substantive repair rounds are available. A technical BLOCKED/ERROR may permit one extra bounded dispatch; unchanged evidence cannot be re-reviewed merely by asking again.
-
-The standard gate requires current evidence even for routine changes.
-The classifier is conservative and lexical, not semantic understanding.
-Local receipt provenance is not an adversarial security boundary.
-
-Default visual runtime is one pinned target selected by CLI launch auto in iOS → Android → Web order. Additional platform builds/E2E require actual affected platform risk or release scope. Significant layout changes test representative compact, medium, expanded sizes and resize/state preservation with actual feature widget tests; use real wide runtime evidence when materially affected, not a mandatory three-platform matrix. Small changes stay scoped.
-
-The fast standard runner stops at the first failed step; Flutter uses --fail-fast, a 45s default per-test timeout and a 180s suite watchdog. Explicitly set HARNESS_TEST_SUITE_TIMEOUT for larger known suites (1–1800s), not to hide a hanging test. A single canonical check may run per checkout. Failed checks retain reports and a bounded local log tail; diagnostics remain available without a session export. A supplied baseline must match task.json's original digest. Do not compare against historical captures when baseline is unavailable.
-
-Use `diagnostics --local` for immediate local evidence without any OpenCode export. The standard diagnostics command persists local facts before attempting usage export.
-
-For focused UI and new screens omit baseline. Capture the original actual screen explicitly before edits only when comparison matters; use its exact task digest. Batch capture reuses task-scoped platform runtime input digest/device/theme/fixture/script-hash receipts; --refresh LABEL forces both themes of one changed state. The full delivery/check/review digest remains exact. Test-only Dart files and other platform trees are excluded from the visual input digest in the standard layout unless referenced in pubspec; unknown files, shared Dart, assets, configuration and scripts remain inputs. Capture receipts retain their original candidate digest. Interaction evidence must use a scripted scenario on every platform. Run visual-evidence before relaunching after a fix; use capture-plan only for missing affected states. Do not ask owners to operate routine UI. One fresh read-only adjudication is available for a first CHANGES_REQUIRED on unchanged evidence; it must explicitly resolve every prior finding and return ADJUDICATION: RESOLVED plus the normal required PASS. Confirmed defects still require repair; no third unchanged-input review. The production quality gate reads the CLI's current standard receipt rather than relying on text alone.
-
-The CLI checks that no canonical check holds the checkout check lock before accepting a current PASS receipt for review or delivery.
-
-Task isolation: the OpenCode conversation may span successive tasks. A task generation owns reviewer/consultation/recovery budgets, requirements and pending tool evidence. Successful canonical delivery is reconciled against the exact local completion receipt immediately and on the next prompt if the idle hook was interrupted. An unfinished or blocked task retains its limits. A subsequent task requires a fresh canonical begin and feature branch; archived receipts are diagnostic only. Session usage exports remain cumulative for the parent conversation, not per-task token measurements.
-
-Local checkpoint commits save coherent tested slices, without approval, push or acceptance. The final check/review considers the complete task diff, including every local commit. Clean checkpointed work may prepare its first delivery manifest; once publication starts its original manifest is preserved.
-
-After a real budget blocker, the owner may explicitly approve canonical review-recovery once for the exact current review input. No same-input unresolved finding bypass, no automatic reset, and no PASS is granted. If acceptance remains blocked, owner-approved save-draft publishes only a committed task branch and verifies an incomplete Draft PR; this is not delivery or permission to merge. Normal deliver alone can make the PR ready after all gates pass.
-
-Expensive canonical check/runtime refuses an uncommitted source/test slice exceeding 400 changed lines or 8 files in the current task. Save a coherent slice after focused checks before reaching that guard; the threshold is a backstop, not a requirement to manufacture commits. Large generated catalogs are reviewed using bounded statistics, generator/schema, representative samples and executable validation rather than raw full-file dumps.
+See README for CLI operations and the recovery path.

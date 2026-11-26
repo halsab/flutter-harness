@@ -57,8 +57,7 @@ require explicit product-standard migration; sync does not rewrite them.
 Use `mobile` for Android/iOS only, or `mobile-web` to include Web. Replace
 `main` with the actual integration branch. Open OpenCode in the project
 directory, select Build / Luna Medium and give one product task. The agent
-handles branch, coherent local checkpoint commits, deterministic impact checks, relevant review and PR creation; you approve
-publication and merge. Ordinary UI interaction is automated with project-local Maestro/Playwright scenarios, not manual requests to the owner. No initial screenshot unless comparison is needed.
+handles branching, implementation, focused impact checks, source-first review and PR creation; you approve publication and merge. Ordinary text/style/size fixes need no simulator, screenshots or Maestro/Playwright. For material UI inspect the affected final runtime only when cheaper evidence is insufficient. Automated scenarios are reserved for actual risk or explicit requirements.
 
 ### Agent scope
 
@@ -117,12 +116,19 @@ There is no need to analyze each Issue manually.
 
 ### Blocked task recovery
 
-A Build agent saves local checkpoints without publication. If review is genuinely exhausted and you explicitly authorize another review, ask Build to use canonical `review-recovery` (one permission-gated extension for current evidence). If work is still incomplete and you want it backed up remotely, explicitly authorize `save-draft` in Build. It requires clean local commits and creates/updates a Draft PR, never a completed delivery receipt. The same task remains active until canonical `deliver` passes all gates. Never merge a draft or bypass acceptance.
+A Build agent saves local checkpoints without publication; there is no size-based checkpoint gate. If verification stalls it offers `save-draft` after checkpoint, with your publication approval. The verified draft parks the task, never reports DONE, and permits a different task in the same conversation. To resume, ask Build to use `begin <existing-feature-branch> --resume` (clean branch, compatible installed revision); it uses fresh evidence and can update the existing draft with canonical deliver. One explicit permission-gated review-recovery remains available for an exhausted review budget. Never merge a draft or bypass acceptance.
+
+For explicitly required automated visuals, `visual-plan.json` scenarios may specify `"themes":["light","dark"]`; the default is light only. A screen state can be captured without a script; an interaction state needs a project-local executable scenario. Code review happens first, independently. Ordinary statically verifiable UI changes require neither a plan nor screenshots.
 
 ### Local checks versus CI
 
-`python3 .flutter-harness/bin/harness.py check` selects unit/widget tests from changed Dart files and their transitive import/export/part dependents. It compares each slice with the last successful candidate (first slice: task base), formats only changed Dart files, avoids unnecessary dependency resolution and records explicit skipped steps. Dependency/global/uncertain changes can expand to the full suite with a recorded reason. A local PASS is an exact candidate-bound impact receipt, not a claim that every test ran. The generated PR CI still executes the complete standard suite. Native and integration/E2E checks are separate and only required for relevant risks. Run the canonical check before each coherent checkpoint; no routine full local final run.
+`python3 .flutter-harness/bin/harness.py check` selects unit/widget tests from changed Dart files and their transitive import/export/part dependents. It compares each slice with the last successful candidate (first slice: task base), formats only changed Dart files, avoids unnecessary dependency resolution and records explicit skipped steps. Dependency/global/uncertain changes can expand to the full suite with a recorded reason. A local PASS is an exact candidate-bound impact receipt, not a claim that every test ran. The generated PR CI still executes the complete standard suite. Native and integration/E2E checks are separate and only required for relevant risks. Run the canonical check after implementation and only after meaningful affected fixes; checkpoint coherent work without requiring a check. No routine full local final run.
 
 ### Fast CI for Harness itself
 
 Every Harness PR and push to `main` runs the SDK-free Bash, Node, Python, configuration and installer checks. The real Flutter starter job runs automatically only when a PR changes starter creation, generated Dart/scaffold templates, or product policy validation; on `main` pushes the fast checks are sufficient to avoid re-running the PR's starter build. Run **Actions → Bootstrap quality → Run workflow** on the desired ref (or `gh workflow run bootstrap.yml --ref <branch>`) to explicitly exercise the real starter, for example after changing Flutter command/SDK contracts or directly changing starter files on `main`. Other PRs skip the SDK job entirely, including cache restore. The workflow cancels superseded runs for the same event/ref. Application PR CI is separate and retains the complete Flutter suite.
+
+
+### Task resource diagnostics
+
+Use `python3 .flutter-harness/bin/harness.py diagnostics --local` for current task elapsed time, stage counts, selected tests and local evidence without exporting OpenCode. Normal `diagnostics` and `usage` (without explicit session IDs) filter sanitized exports using observed task boundaries; missing timestamps are reported as partial. Explicit session IDs in `usage` retain cumulative behavior. Canonical check reuses identical PASS and stops repeated unchanged failures after two attempts. Fix actual inputs rather than changing unrelated files to reset the guard. If the external prerequisite cannot be repaired, preserve a draft. Live token counters are not guaranteed by the plugin API; no billing or savings claim follows from these diagnostics.

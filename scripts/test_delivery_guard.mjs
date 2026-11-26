@@ -81,7 +81,7 @@ test("visual progress participates in recovery; exhausted budget stops immediate
   const result={current:base,reasons:["incomplete"]};
   const q={phase:"visual",issue:"missing",digest:"a",check:"passed",visualDigest:"one"};
   const first=recovery({attempts:0},result,q);
-  assert.match(first.prompt,/Do not dispatch a reviewer/);
+  assert.match(first.prompt,/Do not dispatch another reviewer/);
   assert.equal(recovery({attempts:1,lastRecovery:first.fingerprint},result,{...q,visualDigest:"two"}).stop,false);
   assert.equal(recovery({attempts:0},result,{...q,phase:"blocked"}).stop,true);
 });
@@ -228,7 +228,8 @@ test("read-only conversation does not require delivery, but a begun or recoverin
   await prompt();begin={stage:"begin"};const id=task().id;
   await idle();assert.equal(task().active,true);assert.equal(task().attempts,1);
   begin=null;await prompt();assert.equal(task().id,id);
-  await assert.rejects(idle(),/INCOMPLETE/);assert.equal(task().active,true);
+  await idle();assert.equal(task().active,true);assert.equal(task().finalReminder,true);
+  const count=continuations;await idle();assert.equal(continuations,count);
 });
 
  test("clean local checkpoints may prepare a first delivery manifest",()=>{
@@ -269,4 +270,28 @@ test("Plan to Build: no-start recovery never enters check gate, retires failed s
   const third=task().id;
   values.set("task/root",{...task(),attempts:2});
   await prompt();assert.equal(task().id,third);assert.equal(task().attempts,2);
+});
+
+
+test("verified draft parks without PASS and permits a new task",async()=>{
+  const {taskLifecycle}=await import("../plugins/delivery-guard/lifecycle.mjs");
+  const values=new Map(),records=[];
+  const snap={head:"a",branch:"feature/parked",status:"",digest:"candidate"};
+  let draft=null;
+  const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v)},session:{synthetic:async()=>{}}};
+  const life=taskLifecycle(ctx,{assertRevision:async()=>{},snapshot:async()=>snap,completion:async()=>null,draftCompletion:async()=>draft,
+    quality:{clear:async()=>{}},resources:{clear:async()=>{},status:async()=>""},
+    record:async(id,stage)=>records.push(stage),saveSessions:async()=>{},archive:async()=>{},lastBegin:async()=>({stage:"begin"})});
+  const prompt=()=>life.prompt({sessionID:"root",prompt:{text:"реализуй"}});
+  const task=()=>values.get("task/root");
+  await prompt();const old=task().id;
+  await life.authorizeDraft({sessionID:"root",id:"draft"},task());
+  draft={...snap,status:"DRAFT_SAVED",saved_at:Date.now()};
+  await life.delivered({tool:"shell",sessionID:"root",id:"draft",status:"completed",result:{metadata:{exit:0}}});
+  assert.equal(task().active,false);
+  assert.equal(task().outcome,"DRAFT_SAVED");
+  assert.ok(records.includes("task-parked"));
+  assert.ok(!records.includes("task-complete"));
+  await prompt();assert.notEqual(task().id,old);
+  assert.equal(task().lastParkedBranch,"feature/parked");
 });

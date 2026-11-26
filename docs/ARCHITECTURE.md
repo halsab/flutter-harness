@@ -1,6 +1,6 @@
 # Deterministic architecture
 
-One task, one ordinary Git branch, one Build agent. OpenCode handles semantic work; Python CLI handles revision, candidate receipts, native verification, runtime evidence and approved PR delivery. No parallel workers, workspace manager or external controller. Original screenshot is optional when meaningful comparison is needed; required final evidence remains. Bounded recovery and diagnostics use observed state. Install/sync preserves unmanaged source. GitHub CI and owner approval remain independent safeguards; local guard is not a sandbox. No auto-merge.
+One task, one ordinary Git branch, one Build agent. OpenCode handles semantic work; Python CLI handles revision, candidate receipts, native verification, runtime evidence and approved PR delivery. No parallel workers, workspace manager or external controller. Source-first verification; independent code review precedes explicitly selected final automated runtime evidence. Routine UI fixes require no screenshots. Checkpoints preserve work, verified drafts park incomplete tasks, and explicit resume starts fresh acceptance. Bounded recovery and task-window diagnostics use observed state. Install/sync preserves unmanaged source. GitHub CI and owner approval remain independent safeguards; local guard is not a sandbox. No auto-merge.
 
 ## Engineering evolution
 

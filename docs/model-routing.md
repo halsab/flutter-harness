@@ -1,5 +1,3 @@
 # Model routing
 
-One Luna Medium Build agent. Optional read-only Luna High architect or one Sol Medium advisor for genuinely difficult decisions; sequential only. Reviewer uses actual risk/diff-based Medium/High effort. Maintenance agents use Low. Skills/MCP off by default. Native CLI first. No automatic premium escalation. Use CLI usage for sanitized counters, not billing totals.
-
-Consultation and recovery limits apply per active task, not per OpenCode conversation. A new prompt alone never resets a failed task.
+One Luna Medium Build agent, unchanged. Optional read-only architect/advisor only for a genuinely difficult decision, never automatic escalation. Independent reviewer uses Luna Medium for focused code and High for material destructive/persistence or broad changes. Review is risk-based, source-first and bounded. Maintenance agents use Low. Skills/MCP off by default. No workers, no automatic premium escalation. Sequential tasks reset their task budgets after verified delivery or explicit draft parking. Usage counters are not billing totals.

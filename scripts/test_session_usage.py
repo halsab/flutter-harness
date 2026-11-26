@@ -71,6 +71,20 @@ class SessionUsageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Duplicate session"):
             summarize([{"info": {"id": "same"}}, {"info": {"id": "same"}}])
 
+    def test_task_window_excludes_previous_parent_messages_and_counts_unknown(self):
+        def message(stamp, count):
+            return {"type":"assistant","model":{"id":"m"},"time":{"created":stamp},"tokens":{"input":count}}
+        parent={"info":{"id":"parent","time":{"created":1,"updated":500}},
+                "messages":[message(10,100),message(200,20),message(450,90),
+                            {"type":"assistant","model":{"id":"m"},"tokens":{"input":999}}]}
+        child={"info":{"id":"child","time":{"created":250,"idle":280}},
+               "messages":[{"type":"assistant","model":{"id":"m"},"tokens":{"input":5}}]}
+        result=summarize([parent,child],100,300)
+        self.assertEqual(result["usage"]["input"],25)
+        self.assertEqual(result["messages_without_task_time"],1)
+        self.assertFalse(result["usage_complete"])
+        self.assertEqual(result["usage_scope"],"task-window")
+
     def test_handles_empty_export(self):
         self.assertEqual(summarize([{"info": {"id": "empty"}, "messages": []}])["usage"]["input"], 0)
 
