@@ -1408,7 +1408,7 @@ def e2e(root,platform,scenario,device):
     output(status="PASS", receipt=str(receipt))
 
 
-def usage(root, sessions, *, emit=True):
+def usage(root, sessions, *, emit=True, since_ms=None, until_ms=None):
     with tempfile.TemporaryDirectory() as tmp:
         exports = []
         for i, session in enumerate(sessions):
@@ -1416,7 +1416,12 @@ def usage(root, sessions, *, emit=True):
             path.write_bytes(run(root, "opencode", "session", "export", session,
                                  "--sanitize", capture=True, timeout=120))
             exports.append(str(path))
-        summary = json.loads(run(root, sys.executable, str(HERE / "session-usage.py"), "--json", *exports, capture=True))
+        flags = []
+        if since_ms is not None:
+            flags += ["--since-ms",str(since_ms)]
+        if until_ms is not None:
+            flags += ["--until-ms",str(until_ms)]
+        summary = json.loads(run(root, sys.executable, str(HERE / "session-usage.py"), "--json", *flags, *exports, capture=True))
         if emit:
             print(json.dumps(summary, indent=2))
         return summary
@@ -1474,6 +1479,17 @@ def diagnostics(root, sessions, *, local_only=False):
         except BlockingIOError:
             data["check_running"]=True
     data["events"]=events
+    task_start = next((x.get("at") for x in events if x.get("stage")=="task-start"),None)
+    task_end = next((x.get("at") for x in reversed(events) if x.get("stage") in ("task-complete","task-parked","task-not-started")),None)
+    since_ms = task_start if isinstance(task_start,int) else None
+    until_ms = (task_end if isinstance(task_end,int) else int(time.time()*1000)) if since_ms is not None else None
+    data["usage_scope"] = "task-window" if since_ms is not None else "session-cumulative"
+    data["task_elapsed_ms"] = max(0,until_ms-since_ms) if since_ms is not None else None
+    data["stage_counts"] = {}
+    for item in events:
+        stage = item.get("stage")
+        if isinstance(stage,str):
+            data["stage_counts"][stage] = data["stage_counts"].get(stage,0)+1
     reports=[]
     for item in events:
         if item.get("stage")!="check-run":
@@ -1499,7 +1515,7 @@ def diagnostics(root, sessions, *, local_only=False):
     atomic_json(target,data)
     if sessions and not local_only:
         try:
-            data["usage"]=usage(root,sessions,emit=False)
+            data["usage"]=usage(root,sessions,emit=False,since_ms=since_ms,until_ms=until_ms)
             data["usage_status"]="PASS"
         except (OSError,ValueError,KeyError,Blocked,subprocess.TimeoutExpired) as exc:
             data["usage_status"]="UNAVAILABLE"
@@ -1648,9 +1664,11 @@ def main():
         elif a.command == "e2e":
             e2e(root, a.platform, a.scenario, a.device)
         elif a.command == "usage":
-            sessions = a.sessions or read_json(work(root)/"sessions.json")["sessions"]
+            meta = {} if a.sessions else read_json(work(root)/"sessions.json")
+            sessions = a.sessions or meta["sessions"]
             require(sessions, "No recorded sessions")
-            usage(root, sessions)
+            usage(root, sessions, since_ms=meta.get("started_at"),
+                  until_ms=meta.get("completed_at") or (int(time.time()*1000) if meta.get("started_at") else None))
         return 0
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
         if a.command in ("begin", "checkpoint", "check", "deliver", "doctor", "launch", "capture", "capture-plan", "prepare-delivery", "validate-delivery", "visual-evidence", "e2e"):

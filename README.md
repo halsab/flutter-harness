@@ -127,3 +127,8 @@ For explicitly required automated visuals, `visual-plan.json` scenarios may spec
 ### Fast CI for Harness itself
 
 Every Harness PR and push to `main` runs the SDK-free Bash, Node, Python, configuration and installer checks. The real Flutter starter job runs automatically only when a PR changes starter creation, generated Dart/scaffold templates, or product policy validation; on `main` pushes the fast checks are sufficient to avoid re-running the PR's starter build. Run **Actions → Bootstrap quality → Run workflow** on the desired ref (or `gh workflow run bootstrap.yml --ref <branch>`) to explicitly exercise the real starter, for example after changing Flutter command/SDK contracts or directly changing starter files on `main`. Other PRs skip the SDK job entirely, including cache restore. The workflow cancels superseded runs for the same event/ref. Application PR CI is separate and retains the complete Flutter suite.
+
+
+### Task resource diagnostics
+
+Use `python3 .flutter-harness/bin/harness.py diagnostics --local` for current task elapsed time, stage counts, selected tests and local evidence without exporting OpenCode. Normal `diagnostics` and `usage` (without explicit session IDs) filter sanitized exports using observed task boundaries; missing timestamps are reported as partial. Explicit session IDs in `usage` retain cumulative behavior. Canonical check reuses identical PASS and stops repeated unchanged failures after two attempts. Fix actual inputs rather than changing unrelated files to reset the guard. If the external prerequisite cannot be repaired, preserve a draft. Live token counters are not guaranteed by the plugin API; no billing or savings claim follows from these diagnostics.

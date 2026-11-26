@@ -35,7 +35,7 @@ export default Plugin.define({
       await mkdir(directory, {recursive:true});
       const target = join(directory,"sessions.json");
       const tmp = target + ".tmp-" + id;
-      await writeFile(tmp, JSON.stringify({sessions:await resources.sessions(id,task),task:task?.id,started_at:task?.startedAt}));
+      await writeFile(tmp, JSON.stringify({sessions:await resources.sessions(id,task),task:task?.id,started_at:task?.startedAt,completed_at:task?.completedAt}));
       await rename(tmp,target);
     }
     let quality, lifecycle;
