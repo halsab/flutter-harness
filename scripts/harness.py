@@ -847,7 +847,7 @@ def _deliver(root, c, state):
         git(root, "commit", "-m", manifest["message"])
     require(not dirty(root) and fingerprint(root) == digest,
             "Commit does not match checked working candidate")
-    require(git(root, "diff", "--name-only", "origin/" + base, "HEAD"),
+    require(git(root, "diff", "--name-only", task["base_head"], "HEAD"),
             "No task change to publish")
     head = text(git(root, "rev-parse", "HEAD"))
     identity["head"] = head

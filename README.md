@@ -116,7 +116,9 @@ There is no need to analyze each Issue manually.
 
 ### Blocked task recovery
 
-A Build agent saves local checkpoints without publication. If review is genuinely exhausted and you explicitly authorize another review, ask Build to use canonical `review-recovery` (one permission-gated extension for current evidence). If work is still incomplete and you want it backed up remotely, explicitly authorize `save-draft` in Build. It requires clean local commits and creates/updates a Draft PR, never a completed delivery receipt. The same task remains active until canonical `deliver` passes all gates. Never merge a draft or bypass acceptance.
+A Build agent saves local checkpoints without publication; there is no size-based checkpoint gate. If verification stalls it offers `save-draft` after checkpoint, with your publication approval. The verified draft parks the task, never reports DONE, and permits a different task in the same conversation. To resume, ask Build to use `begin <existing-feature-branch> --resume` (clean branch, compatible installed revision); it uses fresh evidence and can update the existing draft with canonical deliver. One explicit permission-gated review-recovery remains available for an exhausted review budget. Never merge a draft or bypass acceptance.
+
+For explicitly required automated visuals, `visual-plan.json` scenarios may specify `"themes":["light","dark"]`; the default is light only. A screen state can be captured without a script; an interaction state needs a project-local executable scenario. Code review happens first, independently. Ordinary statically verifiable UI changes require neither a plan nor screenshots.
 
 ### Local checks versus CI
 

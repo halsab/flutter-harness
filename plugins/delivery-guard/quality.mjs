@@ -174,7 +174,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
   return result;
 }, childStatus = async () => "", managedReview = false, reviewAvailability = async () => "", validateManifest = async () => {
   await exec("python3",[join(root,".flutter-harness/bin/harness.py"),"validate-delivery"],{cwd:root,timeout:15000});
-}, verifyCheck = null, validateStart = async()=>"", authorizeDelivery = async()=>{}) {
+}, verifyCheck = null, validateStart = async()=>"", authorizeDelivery = async()=>{}, authorizeDraft = async()=>{}) {
   const key = (id,task) => "quality/" + id + "/" + task.id;
   const pending = (id,task,call) => "quality-call/" + id + "/" + task.id + "/" + call;
   const currentTask = id => ctx.storage.get(taskKey(id));
@@ -202,12 +202,14 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
   }
   async function approved(id, state, change) {
     if (!state.review || state.review.digest !== change.digest) return false;
-    const child = await ctx.session.get({ sessionID: state.review.childID });
-    if (child.parentID !== id || child.agent !== "reviewer" || child.outcome !== "succeeded") return false;
-    if (!matchingReviewModel(child.model, change.effort)) return false;
-    const messages=await ctx.session.context({ sessionID: state.review.childID });
-    if (state.review.dispute && (state.review.childID===state.review.dispute.childID || !resolvedDispute(messages))) return false;
-    return finalVerdict(messages);
+    try {
+      const child = await ctx.session.get({ sessionID: state.review.childID });
+      if (child.parentID !== id || child.agent !== "reviewer" || child.outcome !== "succeeded") return false;
+      if (!matchingReviewModel(child.model, change.effort)) return false;
+      const messages=await ctx.session.context({ sessionID: state.review.childID });
+      if (state.review.dispute && (state.review.childID===state.review.dispute.childID || !resolvedDispute(messages))) return false;
+      return finalVerdict(messages);
+    } catch { return false; } // technical/unavailable child evidence is not approval
   }
   async function checked(v) {
     if (verifyCheck) return await verifyCheck();
@@ -293,6 +295,7 @@ export async function registerQualityGate(ctx, root, base, taskKey, verifyVisual
       if (canonicalDraft(event.input?.command) || canonicalReviewRecovery(event.input?.command)) {
         const startIssue=await validateStart(task);
         if (startIssue) throw Error(startIssue);
+        if (canonicalDraft(event.input?.command)) await authorizeDraft(event,task);
         return; // owner approval below; neither operation authorizes normal delivery
       }
       const why = await reason(id);
