@@ -200,7 +200,7 @@ test("next prompt reconciles interrupted completion, but preserves unfinished bu
   const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v)},session:{synthetic:async()=>{}}};
   const life=taskLifecycle(ctx,{assertRevision:async()=>{},snapshot:async()=>base,completion:async()=>receipt,
     deliveryIdentity:async()=>({branch:"feature/one",digest:"candidate",checked_at:1}),
-    quality:{clear:async()=>{}},resources:{clear:async()=>{}},record:async()=>{},saveSessions:async()=>{},archive:async()=>{}});
+    quality:{clear:async()=>{}},resources:{clear:async()=>{},status:async()=>""},record:async()=>{},saveSessions:async()=>{},archive:async()=>{},lastBegin:async()=>({stage:"begin"})});
   const prompt=()=>life.prompt({sessionID:"root",prompt:{text:"Добавь функцию"}});
   const task=()=>values.get("task/root");
   await prompt();const first=task().id;
@@ -236,4 +236,37 @@ test("read-only conversation does not require delivery, but a begun or recoverin
   const next=recovery({attempts:0},result,{phase:"manifest",issue:"manifest missing",check:"passed",digest:"a"});
   assert.equal(next.stop,false);
   assert.match(next.prompt,/prepare-delivery/);
+});
+
+test("Plan to Build: no-start recovery never enters check gate, retires failed start and permits explicit retry",async()=>{
+  const {taskLifecycle}=await import("../plugins/delivery-guard/lifecycle.mjs");
+  const values=new Map(),records=[],reminders=[];
+  let current={...base,digest:"unchanged"},begin=null;
+  const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v)},
+    session:{synthetic:async e=>reminders.push(e.text)}};
+  const life=taskLifecycle(ctx,{assertRevision:async()=>{},snapshot:async()=>current,
+    completion:async()=>null,lastBegin:async()=>begin,
+    inspect:async()=>({active:true,passed:false,current,reasons:["No task change"]}),
+    quality:{clear:async()=>{},status:async()=>{throw Error("must not enter check gate before begin");}},
+    resources:{clear:async()=>{},status:async()=>"",sessions:async id=>[id]},
+    record:async(id,stage)=>records.push(stage),saveSessions:async()=>{}});
+  const prompt=()=>life.prompt({sessionID:"root",prompt:{text:"реализуй"}});
+  const idle=()=>life.idle({sessionID:"root"});
+  const task=()=>values.get("task/root");
+  await prompt();const first=task().id;
+  await idle();assert.equal(reminders.length,1);assert.match(reminders[0],/root Build implementation agent/);
+  assert.match(reminders[0],/canonical begin/);
+  await idle();assert.equal(task().active,false);assert.equal(task().outcome,"NOT_STARTED");
+  assert.ok(records.includes("task-not-started"));assert.ok(!records.includes("task-complete"));
+  assert.equal(reminders.length,1);
+  await prompt();assert.notEqual(task().id,first);assert.equal(task().attempts,0);
+  // A legacy no-start task already exhausted its idle budget.
+  const second=task().id;
+  values.set("task/root",{...task(),attempts:2});
+  await prompt();assert.notEqual(task().id,second);assert.equal(task().attempts,0);
+  // A genuinely begun task must retain its generation and budget.
+  begin={stage:"begin"};
+  const third=task().id;
+  values.set("task/root",{...task(),attempts:2});
+  await prompt();assert.equal(task().id,third);assert.equal(task().attempts,2);
 });
