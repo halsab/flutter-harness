@@ -171,7 +171,7 @@ test("verified delivery closes task without idle; same OpenCode session receives
   const deps={assertRevision:async()=>{},snapshot:async()=>current,
     completion:async()=>receipt, deliveryIdentity:async()=>({branch:"feature/one",digest:"candidate",checked_at:11}),
     quality:{clear:async(id,t)=>clears.push(t.id),status:async()=>({issue:"",phase:"work"})},
-    resources:{clear:async()=>{},used:async()=>false},
+    resources:{clear:async()=>{},status:async()=>""},
     record:async(id,stage)=>records.push(stage),saveSessions:async()=>{},archive:async t=>archives.push(t.id),
     inspect:async()=>({active:true,passed:false,current,reasons:["not delivered"]}),lastBegin:async()=>null};
   const life=taskLifecycle(ctx,deps), prompt=text=>life.prompt({sessionID:"root",prompt:{text}});
@@ -209,4 +209,24 @@ test("next prompt reconciles interrupted completion, but preserves unfinished bu
   await life.authorize({sessionID:"root",id:"deliver"},task());
   receipt={status:"PASS",branch:"feature/one",digest:"candidate",head:"new",checked_at:1,delivered_at:Math.floor(Date.now()/1000)};
   await prompt();assert.notEqual(task().id,first);assert.equal(task().attempts,0);
+});
+
+test("read-only conversation does not require delivery, but a begun or recovering task cannot reset",async()=>{
+  const {taskLifecycle}=await import("../plugins/delivery-guard/lifecycle.mjs");
+  const values=new Map();let begin=null,waiting="",continuations=0;
+  const ctx={storage:{get:async k=>values.get(k),set:async(k,v)=>values.set(k,v)},
+    session:{synthetic:async()=>{continuations++;}}};
+  const life=taskLifecycle(ctx,{assertRevision:async()=>{},snapshot:async()=>base,
+    completion:async()=>null,quality:{clear:async()=>{},status:async()=>({phase:"check",issue:"missing",check:"missing"})},
+    resources:{clear:async()=>{},status:async()=>waiting},record:async()=>{},saveSessions:async()=>{},archive:async()=>{},
+    inspect:async()=>({active:false,passed:true,current:base,reasons:[]}),lastBegin:async()=>begin});
+  const prompt=()=>life.prompt({sessionID:"root",prompt:{text:"Как устроен Flutter?"}});
+  const idle=()=>life.idle({sessionID:"root"});
+  const task=()=>values.get("task/root");
+  await prompt();waiting="child running";await idle();assert.equal(task().active,true);
+  waiting="";await idle();assert.equal(task().active,false);assert.equal(continuations,0);
+  await prompt();begin={stage:"begin"};const id=task().id;
+  await idle();assert.equal(task().active,true);assert.equal(task().attempts,1);
+  begin=null;await prompt();assert.equal(task().id,id);
+  await assert.rejects(idle(),/INCOMPLETE/);assert.equal(task().active,true);
 });

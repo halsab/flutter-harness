@@ -135,7 +135,6 @@ export async function registerResourceGuard(ctx, taskKey, reviewInputs, prepareR
   return {
     status, reviewAvailability,
     sessions: async (id,task) => [id,...(await read(id,task)).children.map(x=>x.id)],
-    used: id => locked(id,async()=>{const state=await read(id);return !!(state.advisor || state.children?.length || state.pending?.length || state.reviews?.length);}),
     clear: (id,task) => locked(id, async()=>{task ||= await currentTask(id);if(task?.id)await ctx.storage.remove(key(id,task));})
   };
 }

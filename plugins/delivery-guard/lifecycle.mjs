@@ -66,6 +66,7 @@ export function taskLifecycle(ctx, deps) {
     return locked(id,async()=>{
       const state=await get(id);
       if (!state?.active || state.id!==task.id) throw Error("Harness task changed before delivery");
+      if (typeof event.id!=="string" || !event.id) throw Error("Missing canonical delivery call identity");
       const attempt=await deps.deliveryIdentity(state);
       await set(id,{...state,deliveryAttempt:{...attempt,call:event.id,at:Date.now()}});
     });
@@ -96,8 +97,9 @@ export function taskLifecycle(ctx, deps) {
         await deps.record(id,"task-incomplete",{phase:"prerequisite",reason:begin.reason});
         return; // An unfinished task keeps its budget.
       }
-      if (!result.active && !state.deliveryAttempt && !(await deps.resources.used(id))) {
-        await close(id,state);
+      // Read-only conversation is not an unfinished development task.
+      if (!result.active && !begin && !state.deliveryAttempt && !state.attempts) {
+        if (!(await deps.resources.status(id))) await close(id,state);
         return;
       }
       const evidence=await deps.quality.status(id);

@@ -85,3 +85,13 @@ test("new task in same root starts fresh budgets",async()=>{
   await finish(await call("reviewer"),"r3");
   assert.deepEqual(await guard.sessions("main"),["main","a2","r3"]);
 });
+
+test("a late child result from a previous generation cannot be registered in the new task",async()=>{
+  const {call,finish,guard,newTask}=await fixture();
+  const old=await call("advisor");
+  newTask();
+  await finish(old,"late");
+  assert.deepEqual(await guard.sessions("main"),["main"]);
+  await finish(await call("advisor"),"fresh");
+  assert.deepEqual(await guard.sessions("main"),["main","fresh"]);
+});
