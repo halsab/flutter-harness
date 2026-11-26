@@ -3,14 +3,48 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: bootstrap-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   shell-and-installer:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    outputs:
+      starter_required: ${{ steps.starter_scope.outputs.required }}
     steps:
       - uses: actions/checkout@v7
+      - name: Select real Flutter starter check
+        id: starter_scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          required=false
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            required=true
+          elif [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            # The checkout is the PR merge candidate. Compare it with the
+            # exact base from the event, not an advancing remote branch.
+            if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            fi
+            if git diff --quiet "$BASE_SHA" HEAD -- \
+                scripts/new-project.py scripts/init-product.py scripts/check-product.py \
+                templates/product/lib/ templates/product/scaffold/ \
+                templates/product/smoke_test.dart.template templates/product/product.json; then
+              required=false
+            else
+              status=$?
+              [[ "$status" == 1 ]] || exit "$status"
+              required=true
+            fi
+          fi
+          echo "required=$required" >> "$GITHUB_OUTPUT"
+          echo "Real Flutter starter check required: $required"
       - name: Validate Bash syntax
         run: |
           set -euo pipefail
@@ -46,6 +80,8 @@ jobs:
             rm -rf "$tmp"
           done
   material-starter:
+    needs: shell-and-installer
+    if: needs.shell-and-installer.outputs.starter_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
